@@ -15,6 +15,12 @@ function storeWithTmpFailures(tmp) {
   return s;
 }
 
+const _savedCtxEnv = process.env.CLAUDE_CONTEXT_WINDOW_SIZE;
+delete process.env.CLAUDE_CONTEXT_WINDOW_SIZE;
+process.on('exit', () => {
+  if (_savedCtxEnv !== undefined) process.env.CLAUDE_CONTEXT_WINDOW_SIZE = _savedCtxEnv;
+});
+
 console.log('store tests:\n');
 
 // --- addToolEvent ---

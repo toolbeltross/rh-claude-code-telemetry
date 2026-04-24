@@ -7,6 +7,12 @@ import assert from 'assert';
 import { test, summary } from '../helpers/test-harness.js';
 import { resolveContextWindowSize, EXTENDED_CONTEXT_WINDOW_SIZE, DEFAULT_CONTEXT_WINDOW_SIZE } from '../../server/config.js';
 
+const _savedCtxEnv = process.env.CLAUDE_CONTEXT_WINDOW_SIZE;
+delete process.env.CLAUDE_CONTEXT_WINDOW_SIZE;
+process.on('exit', () => {
+  if (_savedCtxEnv !== undefined) process.env.CLAUDE_CONTEXT_WINDOW_SIZE = _savedCtxEnv;
+});
+
 console.log('config tests:\n');
 
 test('resolveContextWindowSize: 1M model name match returns 1M', () => {
