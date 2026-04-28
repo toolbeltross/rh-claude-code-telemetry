@@ -1,25 +1,12 @@
 import { useMemo } from 'react';
 import InfoIcon, { Legend } from './InfoIcon';
+import { getToolColor as getToolToken, IDENTITY, FONT } from '../lib/style-tokens';
 
-const TOOL_COLORS = {
-  Read: '#60a5fa',
-  Write: '#fbbf24',
-  Edit: '#fbbf24',
-  NotebookEdit: '#fbbf24',
-  Bash: '#34d399',
-  Glob: '#34d399',
-  Grep: '#34d399',
-  Agent: '#8b5cf6',
-  ToolSearch: '#6b7280',
-};
-const DEFAULT_COLOR = '#6b7280';
-
+// Adapter: the existing layout code expects a hex string; the style-tokens
+// helper returns a palette entry. Keep this thin so we don't carry tool/color
+// knowledge in this file.
 function getToolColor(tool) {
-  if (!tool) return DEFAULT_COLOR;
-  for (const [key, color] of Object.entries(TOOL_COLORS)) {
-    if (tool.startsWith(key) || tool.includes(key)) return color;
-  }
-  return DEFAULT_COLOR;
+  return getToolToken(tool).hex;
 }
 
 function formatDuration(ms) {
@@ -85,7 +72,7 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
         the Turns tab and expand a row to see the per-call lollipop view.
       </p>
       <div className="flex flex-wrap gap-x-1 gap-y-0.5">
-        <Legend color="bg-cyan" label="tool activity" />
+        <Legend color={IDENTITY.runtime.bg} label="tool activity" />
       </div>
     </div>
   );

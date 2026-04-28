@@ -1,66 +1,21 @@
-const TOOL_COLORS = {
-  Read: 'text-blue',
-  Write: 'text-green',
-  Edit: 'text-amber',
-  Bash: 'text-red',
-  Glob: 'text-cyan',
-  Grep: 'text-cyan',
-  Task: 'text-accent',
-  Agent: 'text-accent',
-  WebFetch: 'text-amber',
-  WebSearch: 'text-amber',
-  TodoWrite: 'text-amber',
-  ToolSearch: 'text-gray-300',
-  AskUserQuestion: 'text-green',
-  EnterPlanMode: 'text-accent',
-  ExitPlanMode: 'text-accent',
-  NotebookEdit: 'text-amber',
-};
+import { getToolColor as getToolToken, TOOL_DESCRIPTIONS, IDENTITY } from '../lib/style-tokens';
 
-const TOOL_DESCRIPTIONS = {
-  Read: 'Reads file contents from disk',
-  Write: 'Creates or overwrites a file',
-  Edit: 'Performs exact string replacements in files',
-  Bash: 'Executes shell commands (git, npm, docker, etc.)',
-  Glob: 'Searches for files by name/pattern',
-  Grep: 'Searches file contents by regex',
-  Task: 'Spawns a subagent to handle a complex subtask',
-  Agent: 'Subagent performing work in parallel',
-  WebFetch: 'Fetches and analyzes web page content',
-  WebSearch: 'Searches the web for information',
-  TodoWrite: 'Writes to the task/todo list',
-  ToolSearch: 'Discovers and loads deferred MCP tools',
-  AskUserQuestion: 'Asks the user a clarifying question',
-  EnterPlanMode: 'Enters planning mode for complex tasks',
-  ExitPlanMode: 'Exits planning mode with a plan for approval',
-  NotebookEdit: 'Edits Jupyter notebook cells',
-  TaskCreate: 'Creates a new task in the task list',
-  TaskUpdate: 'Updates an existing task status',
-  TaskList: 'Lists all tasks',
-  Skill: 'Invokes a user-defined skill/command',
-};
-
-// Strip mcp__*__ prefixes → just the action name
+// Strip mcp__*__ prefixes → just the action name (kept here because the visible
+// formatting also strips a "preview_" prefix specific to the Preview MCP server,
+// which is purely cosmetic and not relevant to the color/category resolution).
 function formatToolName(raw) {
   if (!raw) return '?';
   if (raw.startsWith('mcp__')) {
     const parts = raw.split('__');
-    // mcp__server__tool_name → tool_name
     const action = parts.length >= 3 ? parts.slice(2).join('__') : parts[parts.length - 1];
-    // Shorten common prefixes like "preview_screenshot" → "screenshot"
     return action.replace(/^preview_/, '');
   }
   return raw;
 }
 
-// Get color for tool — check native names first, then MCP action
+// Adapter: legacy callsites in this file expect a Tailwind class string.
 function getToolColor(raw) {
-  if (TOOL_COLORS[raw]) return TOOL_COLORS[raw];
-  const name = formatToolName(raw);
-  if (TOOL_COLORS[name]) return TOOL_COLORS[name];
-  // MCP tools get a default color
-  if (raw.startsWith('mcp__')) return 'text-gray-300';
-  return 'text-gray-300';
+  return getToolToken(raw).text;
 }
 
 // Extract parent/filename from full path
@@ -143,18 +98,18 @@ export default function ToolActivity({ events, expanded }) {
           <InfoIcon>
             <div className="space-y-1.5">
               <p>Live feed of Claude's tool calls from PostToolUse hooks.</p>
+              <p className="text-gray-500">Status (dot color):</p>
               <div className="flex flex-wrap gap-x-1 gap-y-0.5">
                 <Legend color="bg-green" label="success" />
                 <Legend color="bg-red" label="failure" />
                 <Legend color="bg-amber" label="blocked" />
               </div>
+              <p className="text-gray-500">Tool category (name color):</p>
               <div className="flex flex-wrap gap-x-1 gap-y-0.5">
-                <Legend color="bg-blue" label="Read" />
-                <Legend color="bg-green" label="Write" />
-                <Legend color="bg-amber" label="Edit/Web" />
-                <Legend color="bg-red" label="Bash" />
-                <Legend color="bg-cyan" label="Search" />
-                <Legend color="bg-accent" label="Agent" />
+                <Legend color={IDENTITY.fileio.bg}        label={IDENTITY.fileio.label} />
+                <Legend color={IDENTITY.runtime.bg}       label={IDENTITY.runtime.label} />
+                <Legend color={IDENTITY.orchestration.bg} label={IDENTITY.orchestration.label} />
+                <Legend color={IDENTITY.meta.bg}          label={IDENTITY.meta.label} />
               </div>
             </div>
           </InfoIcon>

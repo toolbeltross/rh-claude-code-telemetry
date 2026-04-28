@@ -1,41 +1,24 @@
 import { useState } from 'react';
 import InfoIcon, { Legend } from './InfoIcon';
+import { getToolColor as getToolToken, getToolCategory, IDENTITY } from '../lib/style-tokens';
 
-const TOOL_COLORS = {
-  Read: '#60a5fa',
-  Write: '#fbbf24',
-  Edit: '#fbbf24',
-  NotebookEdit: '#fbbf24',
-  Bash: '#34d399',
-  Glob: '#34d399',
-  Grep: '#34d399',
-  Agent: '#8b5cf6',
-  ToolSearch: '#6b7280',
-};
-const DEFAULT_COLOR = '#6b7280';
+function getToolColor(tool) {
+  return getToolToken(tool).hex;
+}
 
+// Swim lanes mirror the IDENTITY palette categories. Lane order is fixed so
+// related tools (e.g., Read + Edit) group visually.
 const SWIM_LANES = [
-  { label: 'Read',    matches: ['Read'],                            color: '#60a5fa' },
-  { label: 'Edit',    matches: ['Edit', 'Write', 'NotebookEdit'],   color: '#fbbf24' },
-  { label: 'Shell',   matches: ['Bash', 'Glob', 'Grep'],            color: '#34d399' },
-  { label: 'Agent',   matches: ['Agent'],                           color: '#8b5cf6' },
-  { label: 'Other',   matches: [],                                  color: '#6b7280' },
+  { id: 'fileio',        label: 'File I/O',  hex: IDENTITY.fileio.hex },
+  { id: 'runtime',       label: 'Shell/Net', hex: IDENTITY.runtime.hex },
+  { id: 'orchestration', label: 'Orches.',   hex: IDENTITY.orchestration.hex },
+  { id: 'meta',          label: 'Meta',      hex: IDENTITY.meta.hex },
 ];
 
 function getLaneIndex(tool) {
-  if (!tool) return SWIM_LANES.length - 1;
-  for (let i = 0; i < SWIM_LANES.length - 1; i++) {
-    if (SWIM_LANES[i].matches.some(m => tool.startsWith(m) || tool.includes(m))) return i;
-  }
-  return SWIM_LANES.length - 1;
-}
-
-function getToolColor(tool) {
-  if (!tool) return DEFAULT_COLOR;
-  for (const [key, color] of Object.entries(TOOL_COLORS)) {
-    if (tool.startsWith(key) || tool.includes(key)) return color;
-  }
-  return DEFAULT_COLOR;
+  const cat = getToolCategory(tool);
+  const idx = SWIM_LANES.findIndex(l => l.id === cat);
+  return idx === -1 ? SWIM_LANES.length - 1 : idx;
 }
 
 function formatDuration(ms) {
@@ -357,7 +340,7 @@ function SwimlaneView({ events, startTs, totalMs }) {
                       left: `${Math.max(0, Math.min(offsetPct, 100))}%`,
                       width: `${Math.max(0.4, Math.min(widthPct, 100))}%`,
                       height: `${LANE_HEIGHT}px`,
-                      backgroundColor: lane.color,
+                      backgroundColor: lane.hex,
                       minWidth: '2px',
                       boxShadow: failed ? 'inset 0 0 0 1px rgba(248, 113, 113, 0.7)' : 'none',
                     }}

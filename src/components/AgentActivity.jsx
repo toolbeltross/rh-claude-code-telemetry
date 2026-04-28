@@ -1,24 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import InfoIcon, { Legend } from './InfoIcon';
 import { getModelColor, getModelFamily } from '../lib/model-colors';
+import { getAgentTypeColor } from '../lib/style-tokens';
 import SubagentTimeline from './SubagentTimeline';
 
-const TYPE_COLORS = {
-  Explore: 'text-cyan',
-  Plan: 'text-accent',
-  Bash: 'text-red',
-  'general-purpose': 'text-blue',
-  'statusline-setup': 'text-gray-400',
-  'claude-code-guide': 'text-green',
-  'research-analyst': 'text-amber',
-  'security-specialist': 'text-red',
-  'performance-analyst': 'text-cyan',
-  'compatibility-analyst': 'text-green',
-  'pdf-extractor': 'text-amber',
-  'excel-writer': 'text-blue',
-  'facilitator': 'text-accent',
-  'supervisor': 'text-red',
-};
+// Backwards-compatible adapter — existing call sites in this file expect a
+// Tailwind class string keyed by agent type. Resolution lives in
+// `style-tokens.js` (identity-only palette; no status colors).
+const TYPE_COLORS = new Proxy({}, {
+  get: (_target, key) => getAgentTypeColor(key).text,
+});
 
 function formatTime(ts) {
   if (!ts) return '';
