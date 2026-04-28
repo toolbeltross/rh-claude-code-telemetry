@@ -7,11 +7,13 @@ import AgentActivity from './AgentActivity';
 import PerformanceMetrics from './PerformanceMetrics';
 import TurnTracker from './TurnTracker';
 import TurnCostChart from './TurnCostChart';
+import TurnHeartbeat from './TurnHeartbeat';
+import TurnsTab from './TurnsTab';
 import CurrentPrompt from './CurrentPrompt';
 import PlanUsage from './PlanUsage';
 import TaskCompletions from './TaskCompletions';
 
-const TABS = ['Agents', 'Tools', 'Failures', 'Details'];
+const TABS = ['Agents', 'Tools', 'Turns', 'Failures', 'Details'];
 
 function SubTabButton({ active, onClick, children }) {
   return (
@@ -65,6 +67,9 @@ export default function SessionTab({ sessionId, liveSession, session, toolEvents
         </div>
       </div>
 
+      {/* Row 1b: Live Turn Heartbeat — shows current turn's tool activity */}
+      <TurnHeartbeat liveSession={liveSession} toolEvents={toolEvents} sessionId={sessionId} />
+
       {/* Row 2: Plan Usage — Max users only */}
       <PlanUsage planInfo={planInfo} />
 
@@ -90,6 +95,11 @@ export default function SessionTab({ sessionId, liveSession, session, toolEvents
                     {filtered.length}
                   </span>
                 )}
+                {tab === 'Turns' && (liveSession?._turnCount || 0) > 0 && (
+                  <span className="px-1.5 py-0 text-[10px] rounded-full bg-accent/20 text-accent font-mono" title={`${liveSession._turnCount} turns`}>
+                    {liveSession._turnCount}
+                  </span>
+                )}
                 {tab === 'Failures' && failureCount > 0 && (
                   <span className="px-1.5 py-0 text-[10px] rounded-full bg-red/20 text-red font-mono" title={`${failureCount} failures`}>
                     {failureCount}
@@ -107,6 +117,9 @@ export default function SessionTab({ sessionId, liveSession, session, toolEvents
           )}
           {activeSubTab === 'Tools' && (
             <ToolActivity events={filtered} expanded />
+          )}
+          {activeSubTab === 'Turns' && (
+            <TurnsTab liveSession={liveSession} />
           )}
           {activeSubTab === 'Failures' && (
             <FailureHistory failureEvents={failureEvents} failurePatterns={failurePatterns} failureAlerts={failureAlerts} sessionId={sessionId} toolEvents={filtered} expanded />
