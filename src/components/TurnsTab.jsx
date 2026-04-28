@@ -5,6 +5,7 @@ const TOOL_COLORS = {
   Read: '#60a5fa',
   Write: '#fbbf24',
   Edit: '#fbbf24',
+  NotebookEdit: '#fbbf24',
   Bash: '#34d399',
   Glob: '#34d399',
   Grep: '#34d399',
@@ -12,6 +13,22 @@ const TOOL_COLORS = {
   ToolSearch: '#6b7280',
 };
 const DEFAULT_COLOR = '#6b7280';
+
+const SWIM_LANES = [
+  { label: 'Read',    matches: ['Read'],                            color: '#60a5fa' },
+  { label: 'Edit',    matches: ['Edit', 'Write', 'NotebookEdit'],   color: '#fbbf24' },
+  { label: 'Shell',   matches: ['Bash', 'Glob', 'Grep'],            color: '#34d399' },
+  { label: 'Agent',   matches: ['Agent'],                           color: '#8b5cf6' },
+  { label: 'Other',   matches: [],                                  color: '#6b7280' },
+];
+
+function getLaneIndex(tool) {
+  if (!tool) return SWIM_LANES.length - 1;
+  for (let i = 0; i < SWIM_LANES.length - 1; i++) {
+    if (SWIM_LANES[i].matches.some(m => tool.startsWith(m) || tool.includes(m))) return i;
+  }
+  return SWIM_LANES.length - 1;
+}
 
 function getToolColor(tool) {
   if (!tool) return DEFAULT_COLOR;
@@ -161,6 +178,7 @@ function MiniTimeline({ turn }) {
 }
 
 function TurnDetail({ turn }) {
+  const [view, setView] = useState('lollipop');
   const events = turn.events || [];
   if (events.length === 0) {
     return (
@@ -171,46 +189,231 @@ function TurnDetail({ turn }) {
   }
 
   const startTs = turn.startTs || events[0].ts;
+  const totalMs = turn.durationMs || (events[events.length - 1].ts - startTs) || 1;
+
+  const tabs = [
+    { id: 'lollipop', label: 'Lollipop', tip: 'Lollipop chart: stem height ∝ duration, dot color by tool family' },
+    { id: 'swimlane', label: 'Swimlane', tip: 'Swim-lane view: events grouped horizontally by tool family' },
+    { id: 'list',     label: 'List',     tip: 'Chronological list with model-thinking gaps' },
+  ];
 
   return (
     <div className="bg-gray-800/30 border-l-2 border-accent/30 ml-2 mb-1 rounded-b">
-      <div className="px-3 py-1.5 space-y-0">
+      <div className="flex items-center justify-between px-3 pt-1.5">
+        <div className="flex gap-1 text-[10px]">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              type="button"
+              className={`px-1.5 py-0.5 rounded ${view === t.id ? 'bg-accent/20 text-accent border border-accent/40' : 'text-gray-500 border border-transparent hover:text-gray-300'}`}
+              onClick={() => setView(t.id)}
+              title={t.tip}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-[9px] text-gray-500 font-mono">
+          {events.length} event{events.length === 1 ? '' : 's'} · {formatDuration(totalMs)}
+        </span>
+      </div>
+      {view === 'lollipop' && <LollipopView events={events} startTs={startTs} totalMs={totalMs} />}
+      {view === 'swimlane' && <SwimlaneView events={events} startTs={startTs} totalMs={totalMs} />}
+      {view === 'list' && <ListView events={events} startTs={startTs} />}
+    </div>
+  );
+}
+
+function LollipopView({ events, startTs, totalMs }) {
+  const HEIGHT = 80;
+  const maxDuration = Math.max(...events.map(e => e.durationMs || 0), 1000);
+  const ticks = buildScaleTicks(totalMs);
+
+  return (
+    <div className="px-3 py-2">
+      <div className="relative w-full bg-gray-950/50 rounded" style={{ height: `${HEIGHT + 6}px` }}>
+        {/* Tick marks */}
+        {ticks.map((t, i) => (
+          <div
+            key={`tick-${i}`}
+            className="absolute bottom-0 w-px bg-gray-700/30 pointer-events-none"
+            style={{ left: `${t.pct}%`, height: `${HEIGHT}px` }}
+          />
+        ))}
+        {/* Baseline */}
+        <div className="absolute left-0 right-0 bottom-1 h-px bg-gray-700/60" />
+        {/* Stems with dots */}
         {events.map((e, i) => {
-          const offsetSec = ((e.ts - startTs) / 1000).toFixed(1);
-          const gap = i > 0 ? e.ts - (events[i - 1].durationMs || 0) - events[i - 1].ts : e.ts - startTs;
+          const eventEnd = e.ts;
+          const eventStart = eventEnd - (e.durationMs || 0);
+          const midTs = eventStart + (e.durationMs || 0) / 2;
+          const xPct = Math.max(0, Math.min(((midTs - startTs) / totalMs) * 100, 100));
+          const stemHeight = e.durationMs > 0
+            ? Math.max(4, Math.min((e.durationMs / maxDuration) * HEIGHT, HEIGHT))
+            : 5;
+          const color = getToolColor(e.tool);
+          const failed = e.success === false;
+          const offsetSec = ((eventStart - startTs) / 1000).toFixed(1);
+          const tip = `${e.tool}: ${formatDuration(e.durationMs)} at +${offsetSec}s${e.agentId ? ` (agent ${e.agentId.slice(0, 8)})` : ''}${failed ? ' — FAILED' : ''}`;
 
           return (
-            <div key={i} className="flex items-center gap-2 text-[10px] py-0.5">
-              <span className="text-gray-500 font-mono w-12 text-right" title="Seconds since turn start">
-                +{offsetSec}s
-              </span>
-              {gap > 1000 && (
-                <span className="text-accent/60 font-mono text-[9px]" title="Model thinking gap">
-                  ↕{formatDuration(gap)}
-                </span>
-              )}
-              <span
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ backgroundColor: getToolColor(e.tool) }}
+            <div
+              key={i}
+              className="absolute group"
+              style={{ left: `${xPct}%`, bottom: '4px', transform: 'translateX(-50%)' }}
+              title={tip}
+            >
+              <div
+                className="opacity-60 group-hover:opacity-100 transition-opacity"
+                style={{
+                  width: '1.5px',
+                  height: `${stemHeight}px`,
+                  backgroundColor: color,
+                  marginLeft: '2.25px',
+                }}
               />
-              <span className="text-gray-300 font-mono whitespace-nowrap">{e.tool}</span>
-              {e.durationMs != null && (
-                <span className="text-gray-500">{formatDuration(e.durationMs)}</span>
-              )}
-              {e.agentId && (
-                <span className="px-1 py-0 rounded-full bg-accent/10 text-accent border border-accent/30 text-[9px]">
-                  agent
-                </span>
-              )}
-              {e.success === false && (
-                <span className="px-1 py-0 rounded-full bg-red/10 text-red border border-red/40 text-[9px]">
-                  fail
-                </span>
-              )}
+              <div
+                className="absolute rounded-full opacity-90 group-hover:opacity-100 transition-opacity"
+                style={{
+                  width: '6px',
+                  height: '6px',
+                  backgroundColor: color,
+                  bottom: `${stemHeight - 3}px`,
+                  left: '0',
+                  boxShadow: failed ? '0 0 0 1.5px rgba(248, 113, 113, 0.7)' : 'none',
+                }}
+              />
             </div>
           );
         })}
       </div>
+      <div className="relative w-full mt-0.5" style={{ height: '12px' }}>
+        {ticks.map((t, i) => (
+          <span
+            key={`label-${i}`}
+            className="absolute text-[9px] text-gray-500 font-mono"
+            style={{ left: `${t.pct}%`, transform: i === 0 ? 'none' : 'translateX(-50%)' }}
+          >
+            {formatScaleLabel(t.ms)}
+          </span>
+        ))}
+        <span className="absolute text-[9px] text-gray-400 font-mono" style={{ right: 0 }}>
+          {formatScaleLabel(totalMs)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function buildScaleTicks(totalMs) {
+  if (totalMs <= 0) return [];
+  let interval;
+  if (totalMs <= 30_000) interval = 5_000;
+  else if (totalMs <= 60_000) interval = 10_000;
+  else if (totalMs <= 180_000) interval = 30_000;
+  else if (totalMs <= 600_000) interval = 60_000;
+  else interval = 120_000;
+  const ticks = [];
+  for (let t = 0; t <= totalMs; t += interval) {
+    ticks.push({ ms: t, pct: (t / totalMs) * 100 });
+  }
+  return ticks;
+}
+
+function formatScaleLabel(ms) {
+  const totalSec = Math.round(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (m > 0) return `${m}:${String(s).padStart(2, '0')}`;
+  return `${totalSec}s`;
+}
+
+function SwimlaneView({ events, startTs, totalMs }) {
+  const LANE_HEIGHT = 16;
+
+  return (
+    <div className="px-3 py-2 space-y-1">
+      {SWIM_LANES.map((lane, laneIdx) => {
+        const laneEvents = events.filter(e => getLaneIndex(e.tool) === laneIdx);
+        if (laneEvents.length === 0) return null;
+        const totalLaneMs = laneEvents.reduce((s, e) => s + (e.durationMs || 0), 0);
+        return (
+          <div key={lane.label} className="flex items-center gap-2">
+            <span className="text-[10px] text-gray-400 font-mono w-12 text-right">{lane.label}</span>
+            <div className="relative flex-1 rounded bg-gray-950/50" style={{ height: `${LANE_HEIGHT}px` }}>
+              {laneEvents.map((e, i) => {
+                const eventStart = e.ts - (e.durationMs || 0);
+                const offsetPct = ((eventStart - startTs) / totalMs) * 100;
+                const minWidthPct = (Math.max(totalMs * 0.005, 100) / totalMs) * 100;
+                const widthPct = (e.durationMs || 0) > 0
+                  ? ((e.durationMs / totalMs) * 100)
+                  : minWidthPct;
+                const failed = e.success === false;
+                return (
+                  <div
+                    key={i}
+                    className="absolute top-0 rounded-sm opacity-80 hover:opacity-100 transition-opacity"
+                    style={{
+                      left: `${Math.max(0, Math.min(offsetPct, 100))}%`,
+                      width: `${Math.max(0.4, Math.min(widthPct, 100))}%`,
+                      height: `${LANE_HEIGHT}px`,
+                      backgroundColor: lane.color,
+                      minWidth: '2px',
+                      boxShadow: failed ? 'inset 0 0 0 1px rgba(248, 113, 113, 0.7)' : 'none',
+                    }}
+                    title={`${e.tool}: ${formatDuration(e.durationMs)} at +${((e.ts - startTs - (e.durationMs || 0)) / 1000).toFixed(1)}s${e.agentId ? ` (agent ${e.agentId.slice(0, 8)})` : ''}${failed ? ' — FAILED' : ''}`}
+                  />
+                );
+              })}
+            </div>
+            <span className="text-[9px] text-gray-500 font-mono w-16 text-left">
+              {laneEvents.length}× · {formatDuration(totalLaneMs)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ListView({ events, startTs }) {
+  return (
+    <div className="px-3 py-1.5 space-y-0">
+      {events.map((e, i) => {
+        const offsetSec = ((e.ts - startTs) / 1000).toFixed(1);
+        const gap = i > 0 ? e.ts - (events[i - 1].durationMs || 0) - events[i - 1].ts : e.ts - startTs;
+
+        return (
+          <div key={i} className="flex items-center gap-2 text-[10px] py-0.5">
+            <span className="text-gray-500 font-mono w-12 text-right" title="Seconds since turn start">
+              +{offsetSec}s
+            </span>
+            {gap > 1000 && (
+              <span className="text-accent/60 font-mono text-[9px]" title="Model thinking gap">
+                ↕{formatDuration(gap)}
+              </span>
+            )}
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: getToolColor(e.tool) }}
+            />
+            <span className="text-gray-300 font-mono whitespace-nowrap">{e.tool}</span>
+            {e.durationMs != null && (
+              <span className="text-gray-500">{formatDuration(e.durationMs)}</span>
+            )}
+            {e.agentId && (
+              <span className="px-1 py-0 rounded-full bg-accent/10 text-accent border border-accent/30 text-[9px]">
+                agent
+              </span>
+            )}
+            {e.success === false && (
+              <span className="px-1 py-0 rounded-full bg-red/10 text-red border border-red/40 text-[9px]">
+                fail
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -5,6 +5,7 @@ const TOOL_COLORS = {
   Read: '#60a5fa',
   Write: '#fbbf24',
   Edit: '#fbbf24',
+  NotebookEdit: '#fbbf24',
   Bash: '#34d399',
   Glob: '#34d399',
   Grep: '#34d399',
@@ -38,6 +39,22 @@ function formatScaleLabel(ms) {
   return `${totalSec}s`;
 }
 
+function buildScaleTicks(totalMs) {
+  if (totalMs <= 0) return [];
+  let interval;
+  if (totalMs <= 30_000) interval = 5_000;
+  else if (totalMs <= 60_000) interval = 10_000;
+  else if (totalMs <= 180_000) interval = 30_000;
+  else if (totalMs <= 600_000) interval = 60_000;
+  else interval = 120_000;
+
+  const ticks = [];
+  for (let t = 0; t <= totalMs; t += interval) {
+    ticks.push({ ms: t, pct: (t / totalMs) * 100 });
+  }
+  return ticks;
+}
+
 export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
   const events = liveSession?._currentTurnEvents || [];
   const turnStart = liveSession?._currentTurnStartTs;
@@ -56,25 +73,29 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
       durationMs: e.durationMs,
       type: e.type,
       success: e.success,
+      agentId: e.agentId,
     }));
   }, [events, filtered]);
+
+  const infoContent = (
+    <div className="space-y-1.5">
+      <p>
+        Heatmap density of the in-flight turn. Each cell is a time bucket;
+        cyan intensity = how many tool calls fired in that bucket. Open
+        the Turns tab and expand a row to see the per-call lollipop view.
+      </p>
+      <div className="flex flex-wrap gap-x-1 gap-y-0.5">
+        <Legend color="bg-cyan" label="tool activity" />
+      </div>
+    </div>
+  );
 
   if (!isActive || timelineEvents.length === 0) {
     return (
       <div className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Turn Timeline</span>
-          <InfoIcon>
-            <div className="space-y-1.5">
-              <p>Live heartbeat of the current turn. Each block is a tool execution.</p>
-              <div className="flex flex-wrap gap-x-1 gap-y-0.5">
-                <Legend color="bg-blue" label="Read" />
-                <Legend color="bg-green" label="Bash/Glob/Grep" />
-                <Legend color="bg-amber" label="Write/Edit" />
-                <Legend color="bg-accent" label="Agent" />
-              </div>
-            </div>
-          </InfoIcon>
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Turn Heartbeat</span>
+          <InfoIcon>{infoContent}</InfoIcon>
         </div>
         <span className="text-[10px] text-gray-500 mt-1">Waiting for tool activity...</span>
       </div>
@@ -83,126 +104,128 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
 
   const now = Date.now();
   const start = turnStart || timelineEvents[0].ts;
-  const elapsed = now - start;
+  const elapsed = Math.max(now - start, 1);
   const totalToolMs = timelineEvents.reduce((s, e) => s + (e.durationMs || 0), 0);
   const modelMs = Math.max(0, elapsed - totalToolMs);
+  const ticks = buildScaleTicks(elapsed);
+  const lastTool = timelineEvents[timelineEvents.length - 1]?.tool;
+  const lastColor = getToolColor(lastTool);
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-          Turn Timeline
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+            Turn Heartbeat
+          </span>
+          {lastTool && (
+            <span className="inline-flex items-center gap-1 text-[10px] text-gray-500" title={`Last tool: ${lastTool}`}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: lastColor }} />
+              <span className="font-mono">{lastTool}</span>
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-3 text-[10px] text-gray-400">
           <span title="Elapsed time this turn">{formatDuration(elapsed)}</span>
           <span className="text-green" title="Total tool execution time">{formatDuration(totalToolMs)} tools</span>
           <span className="text-accent" title="Estimated model thinking time">{formatDuration(modelMs)} model</span>
           <span title="Tool calls this turn">{timelineEvents.length} calls</span>
-          <InfoIcon>
-            <div className="space-y-1.5">
-              <p>Live heartbeat of the current turn. Each block is a tool execution, width proportional to duration.</p>
-              <div className="flex flex-wrap gap-x-1 gap-y-0.5">
-                <Legend color="bg-blue" label="Read" />
-                <Legend color="bg-green" label="Bash/Glob/Grep" />
-                <Legend color="bg-amber" label="Write/Edit" />
-                <Legend color="bg-accent" label="Agent" />
-                <Legend color="bg-gray-800" label="Model thinking" />
-              </div>
-            </div>
-          </InfoIcon>
+          <InfoIcon>{infoContent}</InfoIcon>
         </div>
       </div>
-      <TimelineStrip events={timelineEvents} startTs={start} nowTs={now} />
+      <HeatmapStrip events={timelineEvents} startTs={start} totalMs={elapsed} ticks={ticks} />
+      <ScaleLabels ticks={ticks} totalMs={elapsed} />
     </div>
   );
 }
 
-function buildScaleTicks(totalMs) {
-  if (totalMs <= 0) return [];
-  let interval;
-  if (totalMs <= 30_000) interval = 5_000;
-  else if (totalMs <= 60_000) interval = 10_000;
-  else if (totalMs <= 180_000) interval = 30_000;
-  else if (totalMs <= 600_000) interval = 60_000;
-  else interval = 120_000;
+function HeatmapStrip({ events, startTs, totalMs, ticks }) {
+  const HEIGHT = 28;
 
-  const ticks = [];
-  for (let t = 0; t <= totalMs; t += interval) {
-    ticks.push({ ms: t, pct: (t / totalMs) * 100 });
-  }
-  return ticks;
-}
+  const buckets = useMemo(() => {
+    let bucketMs;
+    if (totalMs <= 30_000) bucketMs = 1_000;
+    else if (totalMs <= 60_000) bucketMs = 2_000;
+    else if (totalMs <= 180_000) bucketMs = 5_000;
+    else if (totalMs <= 600_000) bucketMs = 15_000;
+    else bucketMs = 30_000;
 
-function TimelineStrip({ events, startTs, nowTs }) {
-  const totalMs = Math.max(nowTs - startTs, 1);
-
-  const blocks = useMemo(() => {
-    const result = [];
+    const numBuckets = Math.max(1, Math.ceil(totalMs / bucketMs));
+    const arr = Array.from({ length: numBuckets }, (_, i) => ({
+      startSec: (i * bucketMs) / 1000,
+      endSec: Math.min(((i + 1) * bucketMs) / 1000, totalMs / 1000),
+      count: 0,
+      totalMs: 0,
+      tools: {},
+    }));
     for (const e of events) {
-      const toolEnd = e.ts;
-      const toolStart = toolEnd - (e.durationMs || 0);
-      const offsetPct = ((toolStart - startTs) / totalMs) * 100;
-      const widthPct = ((e.durationMs || Math.max(totalMs * 0.005, 50)) / totalMs) * 100;
-      result.push({
-        left: Math.max(0, Math.min(offsetPct, 100)),
-        width: Math.max(0.4, Math.min(widthPct, 100 - Math.max(0, offsetPct))),
-        color: getToolColor(e.tool),
-        tool: e.tool,
-        durationMs: e.durationMs,
-        ts: e.ts,
-        success: e.success,
-      });
+      const eventStart = e.ts - (e.durationMs || 0);
+      const offset = eventStart - startTs;
+      const idx = Math.min(numBuckets - 1, Math.max(0, Math.floor(offset / bucketMs)));
+      arr[idx].count += 1;
+      arr[idx].totalMs += e.durationMs || 0;
+      arr[idx].tools[e.tool] = (arr[idx].tools[e.tool] || 0) + 1;
     }
-    return result;
+    return arr;
   }, [events, startTs, totalMs]);
 
-  const ticks = useMemo(() => buildScaleTicks(totalMs), [totalMs]);
+  const maxCount = Math.max(...buckets.map(b => b.count), 1);
 
   return (
     <div className="mt-1.5">
-      {/* Timeline bar */}
-      <div className="relative w-full rounded overflow-hidden bg-gray-950/50" style={{ height: '28px' }}>
-        {blocks.map((b, i) => (
-          <div
-            key={i}
-            className="absolute top-0 rounded-sm opacity-80 hover:opacity-100 transition-opacity"
-            style={{
-              left: `${b.left}%`,
-              width: `${b.width}%`,
-              height: '28px',
-              backgroundColor: b.color,
-              minWidth: '2px',
-            }}
-            title={`${b.tool}: ${b.durationMs ? formatDuration(b.durationMs) : 'no duration'} at ${new Date(b.ts).toISOString().slice(11, 19)}`}
-          />
-        ))}
-        {/* Tick marks inside the bar */}
-        {ticks.map((t, i) => (
+      <div className="relative w-full bg-gray-950/40 rounded-sm overflow-hidden" style={{ height: `${HEIGHT}px` }}>
+        {/* Cells */}
+        <div className="flex w-full gap-px h-full">
+          {buckets.map((b, i) => {
+            const intensity = b.count === 0 ? 0.04 : 0.18 + (b.count / maxCount) * 0.82;
+            const toolList = Object.entries(b.tools).map(([t, n]) => `${t}×${n}`).join(', ');
+            const tip = b.count === 0
+              ? `${b.startSec.toFixed(0)}–${b.endSec.toFixed(0)}s: idle`
+              : `${b.startSec.toFixed(0)}–${b.endSec.toFixed(0)}s: ${b.count} call${b.count === 1 ? '' : 's'} (${toolList}), ${formatDuration(b.totalMs)} total`;
+            return (
+              <div
+                key={i}
+                className="flex-1 transition-opacity hover:opacity-80"
+                style={{
+                  backgroundColor: `rgba(34, 211, 238, ${intensity})`,
+                  minWidth: '2px',
+                }}
+                title={tip}
+              />
+            );
+          })}
+        </div>
+        {/* Tick overlay */}
+        {ticks.slice(1).map((t, i) => (
           <div
             key={`tick-${i}`}
-            className="absolute top-0 w-px bg-gray-700/40"
-            style={{ left: `${t.pct}%`, height: '28px' }}
+            className="absolute top-0 w-px bg-gray-700/40 pointer-events-none"
+            style={{ left: `${t.pct}%`, height: `${HEIGHT}px` }}
           />
         ))}
       </div>
-      {/* Scale labels below */}
-      <div className="relative w-full" style={{ height: '14px' }}>
-        {ticks.map((t, i) => (
-          <span
-            key={`label-${i}`}
-            className="absolute text-[9px] text-gray-500 font-mono"
-            style={{ left: `${t.pct}%`, transform: i === 0 ? 'none' : 'translateX(-50%)' }}
-          >
-            {formatScaleLabel(t.ms)}
-          </span>
-        ))}
+    </div>
+  );
+}
+
+function ScaleLabels({ ticks, totalMs }) {
+  return (
+    <div className="relative w-full" style={{ height: '14px' }}>
+      {ticks.map((t, i) => (
         <span
-          className="absolute text-[9px] text-gray-400 font-mono"
-          style={{ right: 0 }}
+          key={`label-${i}`}
+          className="absolute text-[9px] text-gray-500 font-mono"
+          style={{ left: `${t.pct}%`, transform: i === 0 ? 'none' : 'translateX(-50%)' }}
         >
-          {formatScaleLabel(totalMs)}
+          {formatScaleLabel(t.ms)}
         </span>
-      </div>
+      ))}
+      <span
+        className="absolute text-[9px] text-gray-400 font-mono"
+        style={{ right: 0 }}
+      >
+        {formatScaleLabel(totalMs)}
+      </span>
     </div>
   );
 }
