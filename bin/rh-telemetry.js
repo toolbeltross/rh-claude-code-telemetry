@@ -75,6 +75,8 @@ function printUsage() {
     rh-telemetry digest               Failure digest (last 24h, stdout)
     rh-telemetry digest --append  Append digest to ~/.claude/telemetry-supervisory-log.md
     rh-telemetry digest --hours 48  Custom time window
+    rh-telemetry hook-perf          Hook latency stats (per-hook p50/p95/max)
+    rh-telemetry hook-perf slowest  Top 10 slowest hook invocations
 
   Telemetry queries (passthrough to telemetry-cli):
     rh-telemetry              Session summary (default)
@@ -174,6 +176,11 @@ switch (command) {
     // Failure digest — summarize recent failures
     const digestArgs = args.slice(1);
     run('scripts/failure-digest.js', digestArgs);
+    break;
+  }
+
+  case 'hook-perf': {
+    run('scripts/hook-perf-cli.js', args.slice(1));
     break;
   }
 

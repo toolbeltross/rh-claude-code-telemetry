@@ -440,7 +440,7 @@ if (mode === 'status') {
   const sessionId = argSessionId && !argSessionId.startsWith('$') ? argSessionId : (parsed.session_id || '');
   const cwd = parsed.cwd || '';
   const transcriptPath = parsed.transcript_path || '';
-  debugLog(`tool: name=${toolName} session=${sessionId?.slice(0,8)} cwd=${cwd}`);
+  debugLog(`tool: name=${toolName} session=${sessionId?.slice(0,8)} cwd=${cwd} duration_ms=${parsed.duration_ms} keys=${Object.keys(parsed).join(',')}`);
   try { unlinkSync(IDLE_MARKER_PATH); } catch {}
 
   // Live agent transcript telemetry — when tool fires inside a subagent,
@@ -473,6 +473,8 @@ if (mode === 'status') {
     session_id: sessionId,
     event_type: eventType,
     cwd,
+    duration_ms: parsed.duration_ms ?? null,
+    tool_use_id: parsed.tool_use_id || '',
     agent_id: parsed.agent_id || '',
     agent_type: parsed.agent_type || '',
     _agentLiveMetrics: agentLiveMetrics,
@@ -513,6 +515,8 @@ if (mode === 'status') {
     success: false,
     error: parsed.error || 'Unknown error',
     cwd: parsed.cwd || '',
+    duration_ms: parsed.duration_ms ?? null,
+    tool_use_id: parsed.tool_use_id || '',
     transcript_path: parsed.transcript_path || '',
     agent_id: parsed.agent_id || '',
     agent_type: parsed.agent_type || '',

@@ -97,6 +97,17 @@ export const MAX_FAILURE_CACHE = 1000;
 /** Maximum results returned by failure query endpoints */
 export const MAX_FAILURE_QUERY_RESULTS = 200;
 
+// ── Hook Performance ────────────────────────────────────────────────────────
+
+/** Append-only JSONL log of per-hook-invocation latency records */
+export const HOOK_PERF_LOG_PATH = join(HOME, '.claude', 'hook-perf.jsonl');
+
+/** Maximum hook perf records kept in memory */
+export const MAX_HOOK_PERF_CACHE = 5000;
+
+/** Maximum results returned by hook-perf query endpoints */
+export const MAX_HOOK_PERF_QUERY_RESULTS = 200;
+
 // ── Supervisory Log ──────────────────────────────────────────────────────────
 
 /**
