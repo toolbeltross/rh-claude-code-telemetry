@@ -50,6 +50,30 @@ test('addToolEvent: increments tool count on existing derived session', () => {
   assert.strictEqual(s.data.liveSessions.abc._lastTool, 'Bash');
 });
 
+test('addToolEvent: FIRST event on a fresh session lands in _currentTurnEvents', () => {
+  // Regression: B2 originally placed the per-turn accumulator BEFORE the
+  // live-session derivation block, so on a brand-new session the first
+  // event was missed (no session entry existed yet at the accumulator).
+  // Fixed by relocating the accumulator past derivation.
+  const s = new Store();
+  s.addToolEvent({ tool_name: 'Read', session_id: 'fresh', duration_ms: 180, cwd: '/tmp' });
+  const events = s.data.liveSessions.fresh._currentTurnEvents;
+  assert.ok(Array.isArray(events), 'accumulator array initialized');
+  assert.strictEqual(events.length, 1, 'first event captured');
+  assert.strictEqual(events[0].tool, 'Read');
+  assert.strictEqual(events[0].durationMs, 180);
+});
+
+test('addToolEvent: subsequent events also accumulate in _currentTurnEvents', () => {
+  const s = new Store();
+  s.addToolEvent({ tool_name: 'Read', session_id: 'multi', duration_ms: 100, cwd: '/tmp' });
+  s.addToolEvent({ tool_name: 'Bash', session_id: 'multi', duration_ms: 250, cwd: '/tmp' });
+  s.addToolEvent({ tool_name: 'Edit', session_id: 'multi', duration_ms: 80, cwd: '/tmp' });
+  const events = s.data.liveSessions.multi._currentTurnEvents;
+  assert.strictEqual(events.length, 3);
+  assert.deepStrictEqual(events.map(e => e.tool), ['Read', 'Bash', 'Edit']);
+});
+
 // --- updateLiveSession ---
 test('updateLiveSession: marks _fromStatusLine and preserves prior _toolCount', () => {
   const s = new Store();

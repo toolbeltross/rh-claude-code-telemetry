@@ -145,22 +145,6 @@ class Store extends EventEmitter {
 
     this.emit('toolEvent', toolEvent);
 
-    // Accumulate tool events for current turn timeline
-    if (toolEvent.session) {
-      const sess = this.data.liveSessions[toolEvent.session];
-      if (sess) {
-        if (!sess._currentTurnEvents) sess._currentTurnEvents = [];
-        sess._currentTurnEvents.push({
-          ts: toolEvent.timestamp,
-          tool: toolEvent.tool,
-          durationMs: toolEvent.durationMs,
-          agentId: toolEvent.agentId,
-          type: toolEvent.type,
-          success: toolEvent.success,
-        });
-      }
-    }
-
     // Forced-continuation detection: if Stop was the most recent prompt-lifecycle
     // event (more recent than the last UserPromptSubmit) and a tool event arrives,
     // some Stop hook (Layer 3a, user-configured agent hook, or third-party)
@@ -286,6 +270,25 @@ class Store extends EventEmitter {
         existing._toolCount = (existing._toolCount || 0) + 1;
         existing._lastTool = toolEvent.tool;
         this.emit('liveSession', { id, data: existing });
+      }
+    }
+
+    // Accumulate tool events for current turn timeline. Placed AFTER the
+    // live-session derivation block so the first tool event on a brand-new
+    // session also lands in _currentTurnEvents (the session entry didn't
+    // exist before derivation).
+    if (toolEvent.session) {
+      const sess = this.data.liveSessions[toolEvent.session];
+      if (sess) {
+        if (!sess._currentTurnEvents) sess._currentTurnEvents = [];
+        sess._currentTurnEvents.push({
+          ts: toolEvent.timestamp,
+          tool: toolEvent.tool,
+          durationMs: toolEvent.durationMs,
+          agentId: toolEvent.agentId,
+          type: toolEvent.type,
+          success: toolEvent.success,
+        });
       }
     }
   }
