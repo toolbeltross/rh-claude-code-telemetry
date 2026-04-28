@@ -100,6 +100,73 @@ test('updateLiveSession: detects model switch', () => {
   assert.strictEqual(live._modelSwitches[0].to, 'Sonnet 4.6');
 });
 
+test('updateLiveSession: prefix model name suppresses switch, keeps longer name', () => {
+  const s = new Store();
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus 4.6 (1M context)' },
+    context_window: { current_usage: {} },
+  });
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus' },
+    context_window: { current_usage: {} },
+  });
+  const live = s.data.liveSessions.abc;
+  assert.strictEqual(live._modelSwitches.length, 0, 'no switch for prefix match');
+  assert.strictEqual(live._currentModel, 'Opus 4.6 (1M context)', 'keeps longer name');
+});
+
+test('updateLiveSession: shorter name first, longer prefix arrives later, keeps longer', () => {
+  const s = new Store();
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus' },
+    context_window: { current_usage: {} },
+  });
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus 4.6 (1M context)' },
+    context_window: { current_usage: {} },
+  });
+  const live = s.data.liveSessions.abc;
+  assert.strictEqual(live._modelSwitches.length, 0, 'no switch for prefix match');
+  assert.strictEqual(live._currentModel, 'Opus 4.6 (1M context)', 'keeps longer name');
+});
+
+test('updateLiveSession: repeated prefix flicker never accumulates switches', () => {
+  const s = new Store();
+  const names = ['Opus', 'Opus 4.6 (1M context)', 'Opus', 'Opus 4.6 (1M context)', 'Opus'];
+  for (const name of names) {
+    s.updateLiveSession({
+      session_id: 'abc',
+      model: { display_name: name },
+      context_window: { current_usage: {} },
+    });
+  }
+  const live = s.data.liveSessions.abc;
+  assert.strictEqual(live._modelSwitches.length, 0, 'no switches from prefix flicker');
+  assert.strictEqual(live._currentModel, 'Opus 4.6 (1M context)', 'settled on longer name');
+});
+
+test('updateLiveSession: different version numbers are real switches', () => {
+  const s = new Store();
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus 4.6' },
+    context_window: { current_usage: {} },
+  });
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus 4.7' },
+    context_window: { current_usage: {} },
+  });
+  const live = s.data.liveSessions.abc;
+  assert.strictEqual(live._modelSwitches.length, 1, 'different versions are real switches');
+  assert.strictEqual(live._modelSwitches[0].from, 'Opus 4.6');
+  assert.strictEqual(live._modelSwitches[0].to, 'Opus 4.7');
+});
+
 // --- recordTurnEnd ---
 test('recordTurnEnd: increments turn count', () => {
   const s = new Store();

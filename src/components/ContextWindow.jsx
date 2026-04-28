@@ -43,10 +43,12 @@ export default function ContextWindow({ session, liveSession }) {
     const reported = live._resolvedSize ?? live.context_window_size ?? null;
     const contextLimit = override ?? reported; // user override wins
     const totalInput = live.total_input_tokens ?? 0;
-    // Recalculate fill percentage based on the active limit
-    const fillPct = contextLimit && totalInput > 0
-      ? Math.min(100, Math.round((totalInput / contextLimit) * 100))
-      : (contextLimit ? (live.used_percentage ?? 0) : null);
+    const isOverridden = override !== null && override !== reported;
+    // Prefer statusLine's used_percentage (accurate from session start); recompute from tokens only when user overrides context size
+    const computedPct = contextLimit && totalInput > 0 ? Math.min(100, Math.round((totalInput / contextLimit) * 100)) : null;
+    const fillPct = contextLimit
+      ? (isOverridden ? (computedPct ?? live.used_percentage ?? 0) : (live.used_percentage ?? computedPct ?? 0))
+      : null;
     const usage = live.current_usage || {};
     const input = usage.input_tokens ?? 0;
     const output = usage.output_tokens ?? 0;
@@ -54,7 +56,6 @@ export default function ContextWindow({ session, liveSession }) {
     const cacheWrite = usage.cache_creation_input_tokens ?? 0;
     const cacheHit = cacheRead > 0 ? ((cacheRead / (cacheRead + input || 1)) * 100).toFixed(1) : null;
     const barColor = fillPct !== null ? (fillPct > 80 ? 'bg-red' : fillPct > 50 ? 'bg-amber' : 'bg-accent') : 'bg-gray-600';
-    const isOverridden = override !== null && override !== reported;
 
     // Compute compaction base: context level right after last compaction
     const compactPct = getCompactionBasePct(liveSession);

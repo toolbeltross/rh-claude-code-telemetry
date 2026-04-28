@@ -315,15 +315,21 @@ class Store extends EventEmitter {
     // Context warning thresholds
     data._contextWarning = newCtxPct > 90 ? 'critical' : newCtxPct > 80 ? 'approaching' : null;
 
-    // Detect model switches
+    // Detect model switches — suppress prefix-matched display name flicker
+    // (e.g. "Opus" vs "Opus 4.6 (1M context)" from alternating statusLine posts)
     const newModel = data.model?.display_name || data.model?.id || '';
     const prevModel = existing._currentModel || '';
     const switches = [...(existing._modelSwitches || [])];
+    let resolvedModel = newModel;
     if (prevModel && newModel && prevModel !== newModel) {
-      switches.push({ from: prevModel, to: newModel, ts: Date.now() });
+      if (prevModel.startsWith(newModel) || newModel.startsWith(prevModel)) {
+        resolvedModel = prevModel.length >= newModel.length ? prevModel : newModel;
+      } else {
+        switches.push({ from: prevModel, to: newModel, ts: Date.now() });
+      }
     }
     data._modelSwitches = switches;
-    data._currentModel = newModel;
+    data._currentModel = resolvedModel;
 
     // Preserve turn tracking state from recordTurnEnd
     data._turnCount = existing._turnCount ?? 0;
