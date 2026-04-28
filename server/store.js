@@ -7,6 +7,7 @@ import {
 } from './config.js';
 import { FailureStore } from './failure-store.js';
 import { FailureAlerter } from './failure-alerting.js';
+import { HookPerfStore } from './hook-perf-store.js';
 import { estimateCost } from './cost-rates.js';
 
 class Store extends EventEmitter {
@@ -14,6 +15,8 @@ class Store extends EventEmitter {
     super();
     this.failureStore = new FailureStore();
     this.failureStore.onAppend = (record) => this.emit('failureEvent', record);
+    this.hookPerfStore = new HookPerfStore();
+    this.hookPerfStore.onAppend = (record) => this.emit('hookPerfEvent', record);
     this.failureAlerter = new FailureAlerter();
     this.data = {
       currentSession: null,
@@ -141,6 +144,22 @@ class Store extends EventEmitter {
     }
 
     this.emit('toolEvent', toolEvent);
+
+    // Accumulate tool events for current turn timeline
+    if (toolEvent.session) {
+      const sess = this.data.liveSessions[toolEvent.session];
+      if (sess) {
+        if (!sess._currentTurnEvents) sess._currentTurnEvents = [];
+        sess._currentTurnEvents.push({
+          ts: toolEvent.timestamp,
+          tool: toolEvent.tool,
+          durationMs: toolEvent.durationMs,
+          agentId: toolEvent.agentId,
+          type: toolEvent.type,
+          success: toolEvent.success,
+        });
+      }
+    }
 
     // Forced-continuation detection: if Stop was the most recent prompt-lifecycle
     // event (more recent than the last UserPromptSubmit) and a tool event arrives,
@@ -334,6 +353,8 @@ class Store extends EventEmitter {
     // Preserve turn tracking state from recordTurnEnd
     data._turnCount = existing._turnCount ?? 0;
     data._turnHistory = existing._turnHistory || [];
+    data._currentTurnEvents = existing._currentTurnEvents || [];
+    data._currentTurnStartTs = existing._currentTurnStartTs || null;
     data._tokensPerTurn = existing._tokensPerTurn ?? 0;
     data._estimatedTurnsRemaining = existing._estimatedTurnsRemaining ?? null;
     data._lastTurnCostDelta = existing._lastTurnCostDelta ?? 0;
@@ -543,15 +564,26 @@ class Store extends EventEmitter {
     const ctxPct = session.context_window?.used_percentage ?? 0;
     const totalTokens = session.context_window?.total_input_tokens ?? 0;
 
+    const turnEvents = session._currentTurnEvents || [];
+    const turnStartTs = session._currentTurnStartTs || (turnEvents.length > 0 ? turnEvents[0].ts : Date.now());
+    const turnEndTs = Date.now();
+    const toolTimeMs = turnEvents.reduce((sum, e) => sum + (e.durationMs || 0), 0);
+
     const history = session._turnHistory || [];
     history.push({
       turn: session._turnCount,
       cost: turnCost,
       ctxPct,
       tokens: totalTokens,
-      ts: Date.now(),
+      ts: turnEndTs,
       compact: false,
+      startTs: turnStartTs,
+      durationMs: turnEndTs - turnStartTs,
+      toolTimeMs,
+      toolCount: turnEvents.length,
+      events: turnEvents.slice(-100),
     });
+    session._currentTurnEvents = [];
     if (history.length > MAX_TURN_HISTORY) history.shift();
     session._turnHistory = history;
 
@@ -660,6 +692,8 @@ class Store extends EventEmitter {
     session._lastSeen = Date.now();
     session._currentPrompt = promptText;
     session._lastUserPromptAt = Date.now();
+    session._currentTurnStartTs = Date.now();
+    session._currentTurnEvents = [];
     session._lastLifecycleEvent = 'prompt';
     // Fresh user prompt resets the consecutive-continuation streak — any
     // prior Stop-hook back-and-forth was resolved by the user giving new input.
