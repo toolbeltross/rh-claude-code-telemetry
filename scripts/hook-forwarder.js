@@ -596,6 +596,12 @@ if (mode === 'status') {
   if (!transcriptPath) {
     transcriptMetrics = { status: 'missing-path' };
     debugLog(`subagent-transcript: no transcript_path in stdin — metrics unavailable`);
+  } else if (!existsSync(transcriptPath)) {
+    // B-05: existence guard prevents parseTranscript ENOENT log spam in
+    // subagent-stop (same pattern as B-04 in the tool handler). Subagent
+    // transcripts may be cleaned up before the stop hook fires.
+    transcriptMetrics = { status: 'transcript-not-found', expectedPath: transcriptPath };
+    debugLog(`subagent-stop-transcript-not-found: expected=${transcriptPath}`);
   } else {
     try {
       const txData = parseTranscript(transcriptPath);
@@ -629,8 +635,6 @@ if (mode === 'status') {
         };
         debugLog(`subagent-transcript: model=${txData.model?.display_name || '?'} cost=$${txData.cost?.total_cost_usd || 0} tokens=${transcriptMetrics.tokens.total} turns=${turnCount}`);
       } else {
-        // parseTranscript returned null — means file existed but no usage/cost data
-        // could be extracted. Treat as parse_failed.
         transcriptMetrics = { status: 'parse_failed' };
         debugLog(`subagent-transcript: parse returned null for ${transcriptPath}`);
       }
