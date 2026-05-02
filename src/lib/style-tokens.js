@@ -1,39 +1,77 @@
 /**
  * Single source of truth for color and typography tokens used across components.
  *
- * The whole design rationale lives in this file. Do not scatter inline color
- * choices in components — import from here so future changes propagate.
+ * Do not scatter inline color choices in components — import from here so
+ * future changes propagate.
  *
  * =============================================================================
- * COLOR PALETTES
+ * COLOR SYSTEM — FIVE PALETTES
  * =============================================================================
- * Two distinct palettes coexist, and the rule for separating them is
- * non-negotiable.
+ * Five distinct palettes coexist. Each governs a different semantic domain.
+ * The rule for keeping them separate is non-negotiable: if a viewer can't
+ * tell whether a color means "this model" or "this tool" or "this state,"
+ * the color choice is wrong.
  *
- * STATUS PALETTE — communicates STATE, never identity.
- *   green:  success, processing, low-utilization (good)
- *   red:    failure, blocked, high-utilization (bad)
- *   amber:  warning, medium-utilization, stalled
- *   blue:   idle (specifically the session activity dot, "turn ended")
+ * 1. STATUS — communicates STATE (good/bad/caution/idle).
+ *    green  #34d399  success, processing, live, low-utilization
+ *    red    #f87171  failure, blocked, high-utilization, critical
+ *    amber  #fbbf24  warning, medium-utilization, stalled, validation block
+ *    blue   #60a5fa  idle (session activity dot = "turn ended, waiting")
  *
- *   Status colors must NEVER be applied as identity for tools, agents, models,
- *   or any other category. A red Bash tool in a list reads as "Bash failed"
- *   to anyone glancing at the dashboard. That's the bug class this rule
- *   exists to prevent.
+ *    Status colors must NEVER be applied as category identity for tools,
+ *    agents, models, or metrics. A red Bash tool reads as "Bash failed."
  *
- * IDENTITY PALETTE — distinguishes CATEGORIES.
- *   blue:     data / file I/O / analysis
- *   cyan:     runtime / shell / network / exploration
- *   accent:   orchestration / oversight / planning / search
- *   gray-300: meta / utility / undefined
+ * 2. MODEL — communicates which model is running. Defined in `model-colors.js`.
+ *    accent #8b5cf6  Opus
+ *    blue   #60a5fa  Sonnet
+ *    cyan   #22d3ee  Haiku
  *
- * Models (Opus/Sonnet/Haiku) have a third dedicated palette in
- * `model-colors.js` — also identity-only, kept separate so model identity
- * stays distinguishable from tool / agent identity at a glance.
+ *    Model colors ONLY appear where the intent is "this is Opus / Sonnet /
+ *    Haiku." Contexts: model name labels, model dots next to agent names,
+ *    model breakdown pie/bar charts, cost-per-model tables.
+ *
+ *    Do NOT use model colors for unrelated metrics. Cyan text that says
+ *    "Cache Read 1.0M" looks like "Haiku" at a glance — that's a collision.
+ *
+ * 3. IDENTITY — distinguishes TOOL/AGENT CATEGORIES.
+ *    blue     #60a5fa  File I/O (Read, Write, Edit)
+ *    cyan     #22d3ee  Runtime / shell / network (Bash, WebFetch)
+ *    accent   #8b5cf6  Orchestration (Grep, Glob, Agent, Task)
+ *    gray-300 #aaaabb  Meta / utility (ToolSearch, AskUserQuestion)
+ *
+ *    KNOWN COLLISION: identity and model palettes share hex values. This is
+ *    intentional — the same blue that means "Sonnet" also means "File I/O."
+ *    Context disambiguates: a blue dot next to a model name = Sonnet; a blue
+ *    dot next to a tool name = File I/O category. If context can't disambiguate,
+ *    model wins — add a category label instead of relying on color alone.
+ *
+ * 4. METRICS — data visualization for token counts and resource quantities.
+ *    blue   #60a5fa  Uncached input tokens (fresh, not from cache)
+ *    green  #34d399  Output tokens (model-generated)
+ *    cyan   #22d3ee  Cache read tokens (reused from cache)
+ *    amber  #fbbf24  Cache write tokens (saved for future reuse)
+ *
+ *    These overlap with status and model colors. The collision is documented,
+ *    not ideal, and tolerated because the token-type colors are well-established
+ *    and always appear with their labels ("Cache Read", "Output", etc.).
+ *    Future work: consider shifting to unique tints for metrics.
+ *
+ * 5. VIZ — activity visualizations (heatmaps, playheads, timelines).
+ *    green  #34d399  Active processing / tool activity density
+ *
+ *    The TurnHeartbeat heatmap and playhead use green because the strip
+ *    represents "processing is happening" — the same semantic as the green
+ *    pulsing session dot. Using cyan here would read as "Haiku model."
+ *
+ * PRIORITY WHEN COLORS COLLIDE:
+ *   Model context → model palette wins
+ *   Tool/agent list → identity palette wins
+ *   Labeled metrics → metrics palette (tolerated, always has text label)
+ *   Activity viz → VIZ palette (green for processing)
+ *   State indicators → status palette wins
  *
  * Underlying hex values are defined in `src/index.css` as Tailwind theme
- * tokens (`--color-blue`, `--color-cyan`, `--color-accent`, etc.). Keep this
- * file aligned with that theme.
+ * tokens (`--color-blue`, `--color-cyan`, `--color-accent`, etc.).
  */
 
 // ─── Status palette ─────────────────────────────────────────────────────────
@@ -54,6 +92,20 @@ export const IDENTITY = {
   runtime:       { text: 'text-cyan',     bg: 'bg-cyan',     hex: '#22d3ee', label: 'Shell/Network' },
   orchestration: { text: 'text-accent',   bg: 'bg-accent',   hex: '#8b5cf6', label: 'Orchestration' },
   meta:          { text: 'text-gray-300', bg: 'bg-gray-300', hex: '#aaaabb', label: 'Meta' },
+};
+
+// ─── Visualization palette ──────────────────────────────────────────────────
+// Dedicated colors for activity visualizations (heatmaps, playheads,
+// timelines). Uses green = "processing/active" to stay congruent with the
+// session processing dot and avoid collision with model identity colors.
+export const VIZ = {
+  activity: {
+    hex: '#34d399',
+    rgba: (a) => `rgba(52, 211, 153, ${a})`,
+    text: 'text-green',
+    bg: 'bg-green',
+    label: 'tool activity',
+  },
 };
 
 // ─── Tool → category map ────────────────────────────────────────────────────

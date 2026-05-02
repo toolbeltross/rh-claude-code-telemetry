@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import InfoIcon, { Legend } from './InfoIcon';
-import { getToolColor as getToolToken, IDENTITY, FONT } from '../lib/style-tokens';
+import { getToolColor as getToolToken, VIZ, FONT } from '../lib/style-tokens';
 
 /**
  * Display-window sizing for the live heatmap. Returns a totalMs that:
@@ -99,7 +99,7 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
     <div className="space-y-1.5">
       <p>
         Heatmap density of the in-flight turn. Each cell is a time bucket;
-        cyan intensity = how many tool calls fired in that bucket.
+        green intensity = how many tool calls fired in that bucket.
       </p>
       <p>
         The pulsing vertical line is the live playhead, sweeping right as
@@ -108,7 +108,7 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
       </p>
       <p>Open the Turns tab and expand a row to see the per-call lollipop view.</p>
       <div className="flex flex-wrap gap-x-1 gap-y-0.5">
-        <Legend color={IDENTITY.runtime.bg} label="tool activity" />
+        <Legend color={VIZ.activity.bg} label={VIZ.activity.label} />
       </div>
     </div>
   );
@@ -219,7 +219,7 @@ function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks }) {
                 key={i}
                 className="flex-1 transition-opacity hover:opacity-80"
                 style={{
-                  backgroundColor: `rgba(34, 211, 238, ${intensity})`,
+                  backgroundColor: VIZ.activity.rgba(intensity),
                   minWidth: '2px',
                 }}
                 title={tip}
@@ -246,8 +246,8 @@ function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks }) {
                 height: `${HEIGHT}px`,
                 width: '2px',
                 marginLeft: '-1px',
-                background: 'linear-gradient(to bottom, rgba(34,211,238,0.95), rgba(34,211,238,0.55))',
-                boxShadow: '0 0 6px rgba(34,211,238,0.65)',
+                background: `linear-gradient(to bottom, ${VIZ.activity.rgba(0.95)}, ${VIZ.activity.rgba(0.55)})`,
+                boxShadow: `0 0 6px ${VIZ.activity.rgba(0.65)}`,
                 transition: 'left 240ms linear',
                 zIndex: 2,
               }}
@@ -261,9 +261,9 @@ function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks }) {
                 width: '6px',
                 height: '6px',
                 marginLeft: '-3px',
-                background: '#22d3ee',
+                background: VIZ.activity.hex,
                 borderRadius: '50%',
-                boxShadow: '0 0 4px rgba(34,211,238,0.9)',
+                boxShadow: `0 0 4px ${VIZ.activity.rgba(0.9)}`,
                 transition: 'left 240ms linear',
                 zIndex: 3,
               }}
