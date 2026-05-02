@@ -304,13 +304,8 @@ class Store extends EventEmitter {
     if (existing._toolCount) data._toolCount = existing._toolCount;
     if (existing._lastTool) data._lastTool = existing._lastTool;
 
-    // --- Delta tracking ---
-    const newCost = data.cost?.total_cost_usd ?? 0;
-    const prevCost = existing._prevCost ?? newCost;
-    const costDelta = newCost - prevCost;
-    // Accumulate cost since last turn end (reset by recordTurnEnd)
-    data._costDelta = (existing._costDelta ?? 0) + (costDelta > 0 ? costDelta : 0);
-    data._prevCost = newCost;
+    // Preserve cost-at-last-turn-end for per-turn cost calculation
+    if (existing._costAtLastTurnEnd != null) data._costAtLastTurnEnd = existing._costAtLastTurnEnd;
 
     // Context velocity tracking — recalculate percentage for extended-context models
     const modelDisplayName = data.model?.display_name || data.model?.id || '';
@@ -560,7 +555,12 @@ class Store extends EventEmitter {
     session._lastStopAt = Date.now();
     session._stopSeq = (session._stopSeq || 0) + 1;
     session._lastLifecycleEvent = 'stop';
-    const turnCost = session._costDelta || 0;
+
+    // Per-turn cost: difference between current cumulative cost and cost at previous turn end
+    const currentCost = session.cost?.total_cost_usd ?? 0;
+    const costAtLastTurnEnd = session._costAtLastTurnEnd ?? 0;
+    const turnCost = Math.max(0, currentCost - costAtLastTurnEnd);
+    session._costAtLastTurnEnd = currentCost;
     session._lastTurnCostDelta = turnCost;
 
     // Snapshot context percentage at turn end
@@ -589,9 +589,6 @@ class Store extends EventEmitter {
     session._currentTurnEvents = [];
     if (history.length > MAX_TURN_HISTORY) history.shift();
     session._turnHistory = history;
-
-    // Reset accumulator for next turn
-    session._costDelta = 0;
 
     // Compute average tokens per turn from context history deltas
     if (history.length >= 2) {

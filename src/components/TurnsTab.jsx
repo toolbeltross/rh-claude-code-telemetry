@@ -244,7 +244,8 @@ function LollipopView({ events, startTs, totalMs }) {
             <div
               key={i}
               className="absolute group"
-              style={{ left: `${xPct}%`, bottom: '4px', transform: 'translateX(-50%)' }}
+              style={{ left: `${xPct}%`, bottom: '4px', transform: 'translateX(-50%)', padding: '0 4px' }}
+              title={tip}
             >
               {/* Stem */}
               <div
@@ -258,23 +259,22 @@ function LollipopView({ events, startTs, totalMs }) {
               />
               {/* Pin head */}
               <div
-                className="absolute rounded-full opacity-90 group-hover:opacity-100 group-hover:scale-150 transition-all cursor-default"
+                className="absolute rounded-full opacity-90 group-hover:opacity-100 group-hover:scale-150 transition-all"
                 style={{
                   width: '6px',
                   height: '6px',
                   backgroundColor: color,
                   bottom: `${stemHeight - 3}px`,
-                  left: '0',
+                  left: '4px',
                   boxShadow: failed ? '0 0 0 1.5px rgba(248, 113, 113, 0.7)' : 'none',
                 }}
-                title={tip}
               />
               {/* Number label above pin */}
               <span
                 className="absolute text-[8px] font-mono text-gray-500 group-hover:text-gray-300 transition-colors select-none pointer-events-none"
                 style={{
                   bottom: `${stemHeight + 2}px`,
-                  left: '3px',
+                  left: '7px',
                   transform: 'translateX(-50%)',
                   lineHeight: 1,
                 }}

@@ -102,7 +102,7 @@ export default function PlanUsage({ planInfo, inline }) {
   );
 
   if (inline) return (
-    <div className="border border-gray-700 rounded-lg px-2.5 py-1">
+    <div className="border border-gray-700 rounded-lg px-2 py-0.5">
       {inner}
     </div>
   );

@@ -369,18 +369,10 @@ export default function App() {
       {statusLineModalOpen && <StatusLineModal statusLineState={data.statusLineState} onClose={() => setStatusLineModalOpen(false)} />}
 
       {/* Header */}
-      <header className="flex items-center justify-between mb-2 px-2">
-        {/* Plan usage + model legend */}
-        <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
+      <header className="flex items-center gap-2 mb-2 px-2">
+        {/* Plan usage — fills available space */}
+        <div className="flex-1 min-w-0">
           <PlanUsage planInfo={data.planInfo} inline />
-          <div className="hidden lg:flex items-center gap-2.5 shrink-0">
-            {Object.entries(MODEL_COLORS).map(([name, mc]) => (
-              <span key={name} className={`inline-flex items-center gap-1 text-[11px] ${mc.text}`} title={`${name} model`}>
-                <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: mc.hex }} />
-                {name}
-              </span>
-            ))}
-          </div>
         </div>
 
         {/* Grouped icon strip */}
