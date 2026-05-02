@@ -38,7 +38,7 @@ export default function PlanUsage({ planInfo, inline }) {
   const inner = (
     <div className={`flex items-center ${inline ? 'gap-2 flex-nowrap min-w-0' : 'gap-5 flex-wrap'}`}>
       <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 inline-flex items-center gap-1 shrink-0" title={`Plan usage for ${tierName || 'Max'} — rolling windows reset automatically`}>
-        {tierName && <span className="text-[10px] text-accent font-mono">{tierName}</span>}
+        {tierName && <span className="text-[11px] text-accent font-mono font-bold">{tierName}</span>}
         <InfoIcon>
           <div className="space-y-1.5">
             <p>{tierName || 'Max'} plan usage. 5hr = rolling message limit. 7-day = weekly cap. At 100% you're blocked until reset (or Extra Usage kicks in).</p>
@@ -102,7 +102,7 @@ export default function PlanUsage({ planInfo, inline }) {
   );
 
   if (inline) return (
-    <div className="border border-gray-700 rounded-lg px-2 py-0.5">
+    <div className="flex items-center border border-gray-700 rounded-lg px-2 py-0.5" style={{ minHeight: '34px' }}>
       {inner}
     </div>
   );
@@ -118,7 +118,7 @@ function ExtraUsageSection({ extra, extraActive, anyApproaching, extraUsedDollar
   if (!extra.is_enabled) {
     return (
       <div className="flex items-center gap-1.5" title="Extra Usage disabled — blocked when plan limits hit">
-        <span className="text-[10px] uppercase text-gray-400">Extra</span>
+        <span className="text-[11px] uppercase text-gray-400 font-bold">Extra</span>
         <span className="text-[11px] font-mono text-gray-500">OFF</span>
       </div>
     );
@@ -142,7 +142,7 @@ function ExtraUsageSection({ extra, extraActive, anyApproaching, extraUsedDollar
         : `Extra Usage enabled — kicks in when plan limits reached${extraLimitDollars ? `, monthly cap: $${extraLimitDollars.toFixed(0)}` : ''}`
       }>
         {extraActive && <span className="inline-block w-2 h-2 rounded-full bg-amber animate-pulse-dot" />}
-        <span className="text-[10px] uppercase text-gray-400">Extra</span>
+        <span className="text-[11px] uppercase text-gray-400 font-bold">Extra</span>
         <span className={`text-[11px] font-mono ${statusClass}`}>{statusLabel}</span>
       </div>
 
@@ -177,7 +177,7 @@ function UsageGauge({ label, utilization, resetsAt, tooltip, compact }) {
 
   return (
     <div className={`flex items-center ${compact ? 'gap-1 shrink' : 'gap-2'}`}>
-      <span className="text-[10px] uppercase text-gray-400 shrink-0" title={labelTitle}>{label}</span>
+      <span className="text-[11px] uppercase text-gray-400 shrink-0 font-bold" title={labelTitle}>{label}</span>
       <div className={`${compact ? 'w-12 min-w-[20px] shrink' : 'w-20'} h-1.5 bg-gray-700 rounded-full overflow-hidden`} title={`${pct}% of ${label} window used${resetStr ? ` — resets in ${resetStr}` : ''}`}>
         <div className={`h-full rounded-full ${barColor}`} style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
