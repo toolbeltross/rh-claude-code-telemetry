@@ -1,3 +1,5 @@
+import { VIZ } from '../lib/style-tokens';
+
 export default function HourlyHeatmap({ stats }) {
   if (!stats?.hourCounts) {
     return (
@@ -40,7 +42,7 @@ export default function HourlyHeatmap({ stats }) {
                   style={{
                     backgroundColor:
                       count > 0
-                        ? `rgba(139, 92, 246, ${intensity})`
+                        ? `${VIZ.activity.rgba(intensity)}`
                         : 'rgba(42, 42, 56, 0.5)',
                   }}
                   title={`${formatHour(h)}: ${count} sessions`}
@@ -60,7 +62,7 @@ export default function HourlyHeatmap({ stats }) {
                 key={opacity}
                 className="w-3 h-3 rounded-sm"
                 style={{
-                  backgroundColor: `rgba(139, 92, 246, ${opacity})`,
+                  backgroundColor: `${VIZ.activity.rgba(opacity)}`,
                 }}
               />
             ))}

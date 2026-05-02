@@ -8,7 +8,8 @@
  *   ToolEvent:   node hook-forwarder.js tool <tool_name> <session_id> [event_type]
  */
 import http from 'http';
-import { appendFileSync, readFileSync, writeFileSync, unlinkSync, openSync, fstatSync, readSync, closeSync, mkdirSync, statSync, renameSync } from 'fs';
+import { appendFileSync, readFileSync, writeFileSync, unlinkSync, openSync, fstatSync, readSync, closeSync, mkdirSync, statSync, renameSync, existsSync } from 'fs';
+import { createHash } from 'crypto';
 import { appendFile } from 'fs/promises';
 import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -149,6 +150,20 @@ function readHead(filePath, maxBytes = 8192) {
 function deriveAgentTranscriptPath(sessionTranscriptPath, agentId) {
   if (!sessionTranscriptPath || !agentId) return '';
   return join(dirname(sessionTranscriptPath), 'subagents', `agent-${agentId}.jsonl`);
+}
+
+/**
+ * F-03 dispatch tagging — stable 16-char hash of the subagent's prompt.
+ * Same prompt → same tag, so SubagentStart and SubagentStop carry the same
+ * correlation key; downstream conflict-detection hooks can match outputs that
+ * came from semantically-identical dispatches without needing schema-level
+ * prompt capture in the SubagentStop payload.
+ */
+function computePromptTag(promptText) {
+  if (!promptText) return '';
+  // Use first 1000 chars to keep the tag stable against trailing-whitespace differences
+  // in transcript reads at start vs stop.
+  return createHash('sha256').update(promptText.slice(0, 1000)).digest('hex').slice(0, 16);
 }
 
 /** Extract the prompt text from the first line of an agent transcript JSONL */
@@ -425,17 +440,28 @@ if (mode === 'status') {
   const sessionId = argSessionId && !argSessionId.startsWith('$') ? argSessionId : (parsed.session_id || '');
   const cwd = parsed.cwd || '';
   const transcriptPath = parsed.transcript_path || '';
-  debugLog(`tool: name=${toolName} session=${sessionId?.slice(0,8)} cwd=${cwd}`);
+  debugLog(`tool: name=${toolName} session=${sessionId?.slice(0,8)} cwd=${cwd} duration_ms=${parsed.duration_ms} keys=${Object.keys(parsed).join(',')}`);
   try { unlinkSync(IDLE_MARKER_PATH); } catch {}
 
   // Live agent transcript telemetry — when tool fires inside a subagent,
-  // parse the agent's transcript for live cost/context/model data
+  // parse the agent's transcript for live cost/context/model data.
+  // B-04 fix: existence guard prevents the parseTranscript ENOENT log spam
+  // (observed 2026-04-25: 20 identical ENOENT log lines for one subagent
+  // whose transcript path doesn't match the deriveAgentTranscriptPath
+  // convention — likely lives under a different project slug). When the
+  // file is absent we still emit a single debug line per tool event so
+  // the path mismatch remains visible.
   let agentLiveMetrics = null;
   if (parsed.agent_id && transcriptPath) {
     try {
       const agentTxPath = deriveAgentTranscriptPath(transcriptPath, parsed.agent_id);
       if (agentTxPath) {
-        agentLiveMetrics = parseTranscript(agentTxPath);
+        if (existsSync(agentTxPath)) {
+          agentLiveMetrics = parseTranscript(agentTxPath);
+        } else {
+          agentLiveMetrics = { status: 'transcript-not-found', expectedPath: agentTxPath };
+          debugLog(`agent-transcript-not-found: id=${parsed.agent_id} expected=${agentTxPath}`);
+        }
       }
     } catch {}
   }
@@ -447,6 +473,8 @@ if (mode === 'status') {
     session_id: sessionId,
     event_type: eventType,
     cwd,
+    duration_ms: parsed.duration_ms ?? null,
+    tool_use_id: parsed.tool_use_id || '',
     agent_id: parsed.agent_id || '',
     agent_type: parsed.agent_type || '',
     _agentLiveMetrics: agentLiveMetrics,
@@ -487,6 +515,8 @@ if (mode === 'status') {
     success: false,
     error: parsed.error || 'Unknown error',
     cwd: parsed.cwd || '',
+    duration_ms: parsed.duration_ms ?? null,
+    tool_use_id: parsed.tool_use_id || '',
     transcript_path: parsed.transcript_path || '',
     agent_id: parsed.agent_id || '',
     agent_type: parsed.agent_type || '',
@@ -539,7 +569,10 @@ if (mode === 'status') {
     } catch {}
   }
 
-  debugLog(`subagent-start: session=${sessionId?.slice(0, 8)} type=${parsed.agent_type || '?'} id=${agentId} parent=${parsed.parent_agent_id || '-'} prompt=${prompt.length}chars desc=${description.slice(0, 40)}`);
+  // F-03: stable correlation tag derived from the prompt text
+  const promptTag = computePromptTag(prompt);
+
+  debugLog(`subagent-start: session=${sessionId?.slice(0, 8)} type=${parsed.agent_type || '?'} id=${agentId} parent=${parsed.parent_agent_id || '-'} prompt=${prompt.length}chars tag=${promptTag} desc=${description.slice(0, 40)}`);
   await post('/api/subagent', {
     session_id: sessionId,
     action: 'start',
@@ -549,6 +582,7 @@ if (mode === 'status') {
     transcript_path: parsed.transcript_path || '',
     agent_transcript_path: agentTranscriptPath,
     prompt,
+    promptTag,
     description,
   });
 } else if (mode === 'subagent-stop') {
@@ -566,6 +600,12 @@ if (mode === 'status') {
   if (!transcriptPath) {
     transcriptMetrics = { status: 'missing-path' };
     debugLog(`subagent-transcript: no transcript_path in stdin — metrics unavailable`);
+  } else if (!existsSync(transcriptPath)) {
+    // B-05: existence guard prevents parseTranscript ENOENT log spam in
+    // subagent-stop (same pattern as B-04 in the tool handler). Subagent
+    // transcripts may be cleaned up before the stop hook fires.
+    transcriptMetrics = { status: 'transcript-not-found', expectedPath: transcriptPath };
+    debugLog(`subagent-stop-transcript-not-found: expected=${transcriptPath}`);
   } else {
     try {
       const txData = parseTranscript(transcriptPath);
@@ -599,8 +639,6 @@ if (mode === 'status') {
         };
         debugLog(`subagent-transcript: model=${txData.model?.display_name || '?'} cost=$${txData.cost?.total_cost_usd || 0} tokens=${transcriptMetrics.tokens.total} turns=${turnCount}`);
       } else {
-        // parseTranscript returned null — means file existed but no usage/cost data
-        // could be extracted. Treat as parse_failed.
         transcriptMetrics = { status: 'parse_failed' };
         debugLog(`subagent-transcript: parse returned null for ${transcriptPath}`);
       }
@@ -614,7 +652,11 @@ if (mode === 'status') {
   // Extract prompt from transcript (fallback if SubagentStart missed it)
   const prompt = extractPrompt(transcriptPath);
 
-  debugLog(`subagent-stop: session=${sessionId?.slice(0, 8)} id=${parsed.agent_id || '?'} transcript=${transcriptPath ? 'yes' : 'no'} perm=${parsed.permission_mode || '-'}`);
+  // F-03: same hash function as SubagentStart — same prompt → same tag,
+  // enabling cross-subagent conflict detection without schema-level prompt capture.
+  const promptTag = computePromptTag(prompt);
+
+  debugLog(`subagent-stop: session=${sessionId?.slice(0, 8)} id=${parsed.agent_id || '?'} transcript=${transcriptPath ? 'yes' : 'no'} tag=${promptTag} perm=${parsed.permission_mode || '-'}`);
   await post('/api/subagent', {
     session_id: sessionId,
     action: 'stop',
@@ -625,6 +667,7 @@ if (mode === 'status') {
     _transcriptMetrics: transcriptMetrics,
     permission_mode: parsed.permission_mode || null,
     prompt,
+    promptTag,
   });
 } else if (mode === 'user-prompt') {
   // UserPromptSubmit hook: capture current prompt + clear idle marker
@@ -640,17 +683,28 @@ if (mode === 'status') {
     prompt: promptText,
   });
 } else if (mode === 'config-change') {
-  // ConfigChange hook: log when settings are modified
+  // ConfigChange hook: log when settings are modified.
+  // B-05 fix: skip empty-payload events (config_path === '' AND changes === {}).
+  // Observed 2026-04-25: 13/24h ConfigChange events fire with empty payloads
+  // and surface as "Settings modified: unknown path" failures in the digest,
+  // crowding out real signal. Per-environment Claude Code variants emit these
+  // spuriously; the post is suppressed but the debug line remains so the event
+  // is still observable in hook-debug.log.
   const raw = await readStdin();
   let parsed = {};
   try { parsed = JSON.parse(raw); } catch {}
   const sessionId = parsed.session_id || process.argv[3] || '';
-  debugLog(`config-change: session=${sessionId?.slice(0, 8)}`);
-  await post('/api/config-change', {
-    session_id: sessionId,
-    config_path: parsed.config_path || '',
-    changes: parsed.changes || {},
-  });
+  const configPath = parsed.config_path || '';
+  const changes = parsed.changes || {};
+  const isEmptyPayload = !configPath && (!changes || Object.keys(changes).length === 0);
+  debugLog(`config-change: session=${sessionId?.slice(0, 8)} path=${configPath || '(empty)'} changes=${Object.keys(changes).length} suppressed=${isEmptyPayload}`);
+  if (!isEmptyPayload) {
+    await post('/api/config-change', {
+      session_id: sessionId,
+      config_path: configPath,
+      changes,
+    });
+  }
 } else if (mode === 'task-completed') {
   // TaskCompleted hook: log task completions
   const raw = await readStdin();

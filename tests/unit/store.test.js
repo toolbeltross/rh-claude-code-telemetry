@@ -15,6 +15,12 @@ function storeWithTmpFailures(tmp) {
   return s;
 }
 
+const _savedCtxEnv = process.env.CLAUDE_CONTEXT_WINDOW_SIZE;
+delete process.env.CLAUDE_CONTEXT_WINDOW_SIZE;
+process.on('exit', () => {
+  if (_savedCtxEnv !== undefined) process.env.CLAUDE_CONTEXT_WINDOW_SIZE = _savedCtxEnv;
+});
+
 console.log('store tests:\n');
 
 // --- addToolEvent ---
@@ -42,6 +48,30 @@ test('addToolEvent: increments tool count on existing derived session', () => {
   s.addToolEvent({ tool_name: 'Bash', session_id: 'abc', cwd: '/tmp' });
   assert.strictEqual(s.data.liveSessions.abc._toolCount, 2);
   assert.strictEqual(s.data.liveSessions.abc._lastTool, 'Bash');
+});
+
+test('addToolEvent: FIRST event on a fresh session lands in _currentTurnEvents', () => {
+  // Regression: B2 originally placed the per-turn accumulator BEFORE the
+  // live-session derivation block, so on a brand-new session the first
+  // event was missed (no session entry existed yet at the accumulator).
+  // Fixed by relocating the accumulator past derivation.
+  const s = new Store();
+  s.addToolEvent({ tool_name: 'Read', session_id: 'fresh', duration_ms: 180, cwd: '/tmp' });
+  const events = s.data.liveSessions.fresh._currentTurnEvents;
+  assert.ok(Array.isArray(events), 'accumulator array initialized');
+  assert.strictEqual(events.length, 1, 'first event captured');
+  assert.strictEqual(events[0].tool, 'Read');
+  assert.strictEqual(events[0].durationMs, 180);
+});
+
+test('addToolEvent: subsequent events also accumulate in _currentTurnEvents', () => {
+  const s = new Store();
+  s.addToolEvent({ tool_name: 'Read', session_id: 'multi', duration_ms: 100, cwd: '/tmp' });
+  s.addToolEvent({ tool_name: 'Bash', session_id: 'multi', duration_ms: 250, cwd: '/tmp' });
+  s.addToolEvent({ tool_name: 'Edit', session_id: 'multi', duration_ms: 80, cwd: '/tmp' });
+  const events = s.data.liveSessions.multi._currentTurnEvents;
+  assert.strictEqual(events.length, 3);
+  assert.deepStrictEqual(events.map(e => e.tool), ['Read', 'Bash', 'Edit']);
 });
 
 // --- updateLiveSession ---
@@ -92,6 +122,73 @@ test('updateLiveSession: detects model switch', () => {
   assert.strictEqual(live._modelSwitches.length, 1);
   assert.strictEqual(live._modelSwitches[0].from, 'Opus 4.6');
   assert.strictEqual(live._modelSwitches[0].to, 'Sonnet 4.6');
+});
+
+test('updateLiveSession: prefix model name suppresses switch, keeps longer name', () => {
+  const s = new Store();
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus 4.6 (1M context)' },
+    context_window: { current_usage: {} },
+  });
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus' },
+    context_window: { current_usage: {} },
+  });
+  const live = s.data.liveSessions.abc;
+  assert.strictEqual(live._modelSwitches.length, 0, 'no switch for prefix match');
+  assert.strictEqual(live._currentModel, 'Opus 4.6 (1M context)', 'keeps longer name');
+});
+
+test('updateLiveSession: shorter name first, longer prefix arrives later, keeps longer', () => {
+  const s = new Store();
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus' },
+    context_window: { current_usage: {} },
+  });
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus 4.6 (1M context)' },
+    context_window: { current_usage: {} },
+  });
+  const live = s.data.liveSessions.abc;
+  assert.strictEqual(live._modelSwitches.length, 0, 'no switch for prefix match');
+  assert.strictEqual(live._currentModel, 'Opus 4.6 (1M context)', 'keeps longer name');
+});
+
+test('updateLiveSession: repeated prefix flicker never accumulates switches', () => {
+  const s = new Store();
+  const names = ['Opus', 'Opus 4.6 (1M context)', 'Opus', 'Opus 4.6 (1M context)', 'Opus'];
+  for (const name of names) {
+    s.updateLiveSession({
+      session_id: 'abc',
+      model: { display_name: name },
+      context_window: { current_usage: {} },
+    });
+  }
+  const live = s.data.liveSessions.abc;
+  assert.strictEqual(live._modelSwitches.length, 0, 'no switches from prefix flicker');
+  assert.strictEqual(live._currentModel, 'Opus 4.6 (1M context)', 'settled on longer name');
+});
+
+test('updateLiveSession: different version numbers are real switches', () => {
+  const s = new Store();
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus 4.6' },
+    context_window: { current_usage: {} },
+  });
+  s.updateLiveSession({
+    session_id: 'abc',
+    model: { display_name: 'Opus 4.7' },
+    context_window: { current_usage: {} },
+  });
+  const live = s.data.liveSessions.abc;
+  assert.strictEqual(live._modelSwitches.length, 1, 'different versions are real switches');
+  assert.strictEqual(live._modelSwitches[0].from, 'Opus 4.6');
+  assert.strictEqual(live._modelSwitches[0].to, 'Opus 4.7');
 });
 
 // --- recordTurnEnd ---

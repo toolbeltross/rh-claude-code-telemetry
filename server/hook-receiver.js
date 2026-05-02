@@ -242,6 +242,57 @@ router.get('/failures/top-cost', (req, res) => {
   }
 });
 
+// ── Hook Performance Endpoints ──────────────────────────────────────────────
+
+// Receive hook latency records from oversight hooks
+router.post('/hook-perf', (req, res) => {
+  try {
+    const record = req.body;
+    if (record && record.hook) {
+      store.hookPerfStore.append(record);
+    }
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('[hook-perf] Error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Per-hook latency stats (default: last 24h)
+router.get('/hook-perf', (req, res) => {
+  try {
+    const since = req.query.since ? parseInt(req.query.since, 10) : Date.now() - 24 * 60 * 60 * 1000;
+    res.json(store.hookPerfStore.getStats(since));
+  } catch (err) {
+    console.error('[hook-perf] Stats error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Top N slowest hook invocations
+router.get('/hook-perf/slowest', (req, res) => {
+  try {
+    const n = Math.min(parseInt(req.query.n || '10', 10), 50);
+    const since = req.query.since ? parseInt(req.query.since, 10) : Date.now() - 24 * 60 * 60 * 1000;
+    res.json(store.hookPerfStore.getSlowest(n, since));
+  } catch (err) {
+    console.error('[hook-perf/slowest] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Regression detection (current 24h p95 vs 7-day baseline p95)
+router.get('/hook-perf/regressions', (req, res) => {
+  try {
+    const baselineSince = req.query.baseline ? parseInt(req.query.baseline, 10) : undefined;
+    const currentSince = req.query.current ? parseInt(req.query.current, 10) : undefined;
+    res.json(store.hookPerfStore.detectRegressions(baselineSince, currentSince));
+  } catch (err) {
+    console.error('[hook-perf/regressions] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Debug: log raw incoming hook payloads (temporary)
 router.post('/debug-hooks', (req, res) => {
   console.log('[debug-hooks] Raw body:', JSON.stringify(req.body, null, 2).slice(0, 2000));

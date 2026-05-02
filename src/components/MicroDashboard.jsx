@@ -254,7 +254,7 @@ export default function MicroDashboard({
       {/* Medium+: Token breakdown */}
       {tier !== 'compact' && totalTokens > 0 && (
         <div className="flex items-center gap-1.5 text-[10px]">
-          <span className="text-blue" title={`Input: ${formatTokens(inputTok)}`}>In:{formatTokens(inputTok)}</span>
+          <span className="text-gray-300" title={`Input: ${formatTokens(inputTok)}`}>In:{formatTokens(inputTok)}</span>
           <span className="text-green" title={`Output: ${formatTokens(outputTok)}`}>Out:{formatTokens(outputTok)}</span>
           {cacheReadTok > 0 && <span className="text-cyan" title={`Cache read: ${formatTokens(cacheReadTok)}`}>CR:{formatTokens(cacheReadTok)}</span>}
           {cacheWriteTok > 0 && <span className="text-amber" title={`Cache write: ${formatTokens(cacheWriteTok)}`}>CW:{formatTokens(cacheWriteTok)}</span>}
@@ -266,7 +266,7 @@ export default function MicroDashboard({
         <div className="flex items-center gap-3 flex-wrap">
           <span title={`${activeAgents} subagent${activeAgents !== 1 ? 's' : ''} running, ${completedAgents} completed`}>
             <span className="text-[10px] uppercase text-gray-500">Agents </span>
-            <span className="text-cyan font-semibold">{activeAgents}</span>
+            <span className="text-green font-semibold">{activeAgents}</span>
             {completedAgents > 0 && <span className="text-gray-600"> ({completedAgents} done)</span>}
           </span>
           <span className="text-gray-700">|</span>
@@ -308,8 +308,8 @@ export default function MicroDashboard({
           const [, agent] = currentAgent;
           const elapsed = formatDuration(Date.now() - agent.startedAt);
           return (
-            <div className="text-cyan truncate" title={`Active agent: ${agent.type} — ${agent.description} (${agent.model || '?'}, running ${elapsed})`}>
-              Agent: <span className="text-cyan font-semibold">{agent.type}</span>
+            <div className="text-green truncate" title={`Active agent: ${agent.type} — ${agent.description} (${agent.model || '?'}, running ${elapsed})`}>
+              Agent: <span className="text-green font-semibold">{agent.type}</span>
               <span className="text-gray-500"> {agent.description}</span>
               <span className="text-gray-600"> ({agent.model || '?'}, {elapsed})</span>
             </div>

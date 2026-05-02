@@ -64,4 +64,14 @@ test('total tokens display matches seeded value', async () => {
   });
 });
 
+test('used_percentage shown when total_input_tokens is low (early session)', async () => {
+  await withDashboard(async ({ page, baseUrl }) => {
+    // total_input_tokens=356 computes to 0% of 200K, but used_percentage=6 — should show 6%
+    await postJson(`${baseUrl}/api/status`, statusPayload({ pct: 6, totalInput: 356 }));
+    await page.waitForSelector('text=/6%/', { timeout: 3000 });
+    const found = await page.locator('text=/6%/').count();
+    assert.ok(found > 0, '6% from used_percentage should appear, not 0% from tokens');
+  });
+});
+
 summary();

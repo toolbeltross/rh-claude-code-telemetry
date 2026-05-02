@@ -26,7 +26,7 @@ npm run setup-hooks  # Required: enables live tool feed, validation, prompt capt
 - **Real-time**: WebSocket broadcasts file changes and hook events to all connected clients
 - **Hooks**: Claude Code hooks POST tool events, prompts, agent activity, and live session status
 - **Validation**: PreToolUse hook catches wrong-tool usage (cat→Read, grep→Grep, echo>→Write) before execution (deterministic, no LLM cost)
-- **Supervisory Agent**: Stop agent hook (future) for deep response review; rules enforced via CLAUDE.md conventions
+- **Supervisory Agent**: Layer 3a Stop prompt hook (active) for narrow 3-rule review; Layer 3b Stop agent hook schema-supported but parked (cost decision); rules enforced via CLAUDE.md conventions
 - **Failure Store**: Persistent JSONL log (`~/.claude/telemetry-failures.jsonl`) with in-memory cache, query API, and pattern analysis
 
 ## Data Flow
@@ -42,7 +42,7 @@ Claude Code hooks:
   PostToolUseFailure──→ hook-forwarder.js → POST /api/hooks → store.addToolEvent() + failureStore.append()
                        → telemetry-failures.jsonl (persistent) → WebSocket → FailureHistory
   Stop            ──→ hook-forwarder.js → POST /api/turn-end → store.recordTurnEnd() → idle detection
-                      + agent hook (future) + progress-tracker.js
+                      + Layer 3a prompt hook (active) + Layer 3b agent hook (parked) + appendProgressEntry() (in hook-forwarder.js)
   UserPromptSubmit──→ hook-forwarder.js → POST /api/prompt → store.updatePrompt() → WebSocket → CurrentPrompt
   SubagentStart   ──→ hook-forwarder.js → POST /api/subagent → store.addSubagent() → WebSocket → SubagentTracker
   SubagentStop    ──→ hook-forwarder.js → POST /api/subagent → store.removeSubagent() → WebSocket → SubagentTracker
@@ -415,5 +415,5 @@ Four-tier test harness. Plain Node `assert` scripts — no test framework, no ne
 
 - Context window defaults to 200K for file-based sessions; 1M-context models detected via model display name containing "(1M context)"
 - Build warning: bundle >500KB (Recharts is large) — could code-split
-- Supervisory agent (Stop hook type "agent") requires Claude Code to support agent hook type
+- Supervisory agent Stop hook (Layer 3b): schema supported, not wired — parked pending cost/benefit review (see `scripts/supervisory-agent-prompt.md:50`)
 - Not yet published to npm — `npm publish` when ready

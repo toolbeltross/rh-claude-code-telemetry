@@ -1,25 +1,14 @@
 import { useMemo, useState, useEffect } from 'react';
 import InfoIcon, { Legend } from './InfoIcon';
+import { getAgentTypeColor, IDENTITY } from '../lib/style-tokens';
 
-// Reused from AgentActivity — keep in sync if TYPE_COLORS changes there
-const TYPE_HEX = {
-  Explore: '#22d3ee',
-  Plan: '#8b5cf6',
-  Bash: '#f87171',
-  'general-purpose': '#60a5fa',
-  'claude-code-guide': '#34d399',
-  'research-analyst': '#fbbf24',
-  'security-specialist': '#f87171',
-  'performance-analyst': '#22d3ee',
-  'compatibility-analyst': '#34d399',
-  'pdf-extractor': '#fbbf24',
-  'excel-writer': '#60a5fa',
-  facilitator: '#8b5cf6',
-  supervisor: '#f87171',
-  'statusline-setup': '#9ca3af',
-};
+// Resolution lives in `style-tokens.js`; this Proxy lets existing
+// `TYPE_HEX[agentType]` call sites work without rewriting downstream code.
+const TYPE_HEX = new Proxy({}, {
+  get: (_target, key) => getAgentTypeColor(key).hex,
+});
 
-const DEFAULT_AGENT_COLOR = '#9ca3af';
+const DEFAULT_AGENT_COLOR = IDENTITY.meta.hex;
 const COMPACT_COLOR = '#fbbf24';
 const PROMPT_COLOR = '#60a5fa';
 const STOP_COLOR = '#6b7280';

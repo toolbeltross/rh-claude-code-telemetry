@@ -153,6 +153,14 @@ export function startBroadcaster(server) {
     });
   });
 
+  // Broadcast hook performance events
+  store.on('hookPerfEvent', (data) => {
+    broadcast({
+      type: 'hookPerfEvent',
+      data,
+    });
+  });
+
   console.log('[ws] WebSocket broadcaster ready');
 }
 

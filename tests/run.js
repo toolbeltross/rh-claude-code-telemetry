@@ -46,13 +46,35 @@ function listTests(dir) {
     .sort();
 }
 
+/**
+ * Strip parent-shell env vars that would contaminate test fixtures.
+ *
+ * Verified 2026-04-25: when `CLAUDE_CONTEXT_WINDOW_SIZE=1000000` is set in the
+ * parent shell (e.g., from `~/.claude/settings.json` env block), tests that
+ * exercise `resolveContextWindowSize` and `updateLiveSession` fail because they
+ * inherit the override. Conservative scrub: remove only the env vars proven to
+ * affect test outcomes. Add to this list when new conflicts are discovered.
+ */
+const ENV_VARS_TO_SCRUB = [
+  'CLAUDE_CONTEXT_WINDOW_SIZE', // affects context-window-size resolution tests
+  'OVERSIGHT_LOG_PATH',          // dual-write target — could redirect log writes during integration tests
+  'CLAUDE_TELEMETRY_PORT',       // could redirect server port
+  'PORT',                        // generic port override
+];
+
+function cleanEnv() {
+  const env = { ...process.env };
+  for (const k of ENV_VARS_TO_SCRUB) delete env[k];
+  return env;
+}
+
 function runFile(file) {
   return new Promise((resolve) => {
     const start = Date.now();
     const child = spawn('node', [file], {
       cwd: ROOT,
       stdio: 'inherit',
-      env: process.env,
+      env: cleanEnv(),
     });
     child.on('exit', (code) => {
       resolve({ file, code: code ?? 1, ms: Date.now() - start });

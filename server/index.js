@@ -72,6 +72,7 @@ if (existsSync(distPath)) {
 
 // Start everything
 store.failureStore.load();
+store.hookPerfStore.load();
 startWatchers();
 startBroadcaster(server);
 startPlanDetector(store);
