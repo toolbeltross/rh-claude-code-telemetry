@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import InfoIcon, { Legend } from './InfoIcon';
-import { getToolColor as getToolToken, VIZ, FONT } from '../lib/style-tokens';
+import { getToolColor as getToolToken, IDENTITY, VIZ, FONT } from '../lib/style-tokens';
 
 /**
  * Display-window sizing for the live heatmap. Returns a totalMs that:
@@ -98,17 +98,19 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
   const infoContent = (
     <div className="space-y-1.5">
       <p>
-        Heatmap density of the in-flight turn. Each cell is a time bucket;
-        green intensity = how many tool calls fired in that bucket.
+        Activity strip for the in-flight turn. Each cell is a time bucket
+        colored by the dominant tool category — brighter = more calls.
+        Dark gaps = model thinking time.
       </p>
       <p>
-        The pulsing vertical line is the live playhead, sweeping right as
-        the turn elapses. The strip's right edge stays ~30s ahead of "now"
-        so the playhead always has runway.
+        The pulsing line is the live playhead. The strip extends ~30s
+        ahead so the playhead always has runway.
       </p>
-      <p>Open the Turns tab and expand a row to see the per-call lollipop view.</p>
       <div className="flex flex-wrap gap-x-1 gap-y-0.5">
-        <Legend color={VIZ.activity.bg} label={VIZ.activity.label} />
+        <Legend color={IDENTITY.fileio.bg} label={IDENTITY.fileio.label} />
+        <Legend color={IDENTITY.runtime.bg} label={IDENTITY.runtime.label} />
+        <Legend color={IDENTITY.orchestration.bg} label={IDENTITY.orchestration.label} />
+        <Legend color={IDENTITY.meta.bg} label={IDENTITY.meta.label} />
       </div>
     </div>
   );
@@ -206,20 +208,24 @@ function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks }) {
   return (
     <div className="mt-1.5">
       <div className="relative w-full bg-gray-950/40 rounded-sm overflow-hidden" style={{ height: `${HEIGHT}px` }}>
-        {/* Cells */}
+        {/* Cells — colored by dominant tool category */}
         <div className="flex w-full gap-px h-full">
           {buckets.map((b, i) => {
             const intensity = b.count === 0 ? 0.04 : 0.18 + (b.count / maxCount) * 0.82;
             const toolList = Object.entries(b.tools).map(([t, n]) => `${t}×${n}`).join(', ');
+            const dominant = b.count > 0
+              ? Object.entries(b.tools).reduce((best, cur) => cur[1] > best[1] ? cur : best, ['', 0])[0]
+              : null;
+            const catColor = dominant ? getToolToken(dominant) : VIZ.activity;
             const tip = b.count === 0
-              ? `${b.startSec.toFixed(0)}–${b.endSec.toFixed(0)}s: idle`
-              : `${b.startSec.toFixed(0)}–${b.endSec.toFixed(0)}s: ${b.count} call${b.count === 1 ? '' : 's'} (${toolList}), ${formatDuration(b.totalMs)} total`;
+              ? `${b.startSec.toFixed(0)}–${b.endSec.toFixed(0)}s: model thinking`
+              : `${b.startSec.toFixed(0)}–${b.endSec.toFixed(0)}s: ${b.count} call${b.count === 1 ? '' : 's'} (${toolList}), ${formatDuration(b.totalMs)} tool time`;
             return (
               <div
                 key={i}
                 className="flex-1 transition-opacity hover:opacity-80"
                 style={{
-                  backgroundColor: VIZ.activity.rgba(intensity),
+                  backgroundColor: `${catColor.hex}${Math.round(intensity * 255).toString(16).padStart(2, '0')}`,
                   minWidth: '2px',
                 }}
                 title={tip}
