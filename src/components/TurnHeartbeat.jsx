@@ -1,6 +1,35 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import InfoIcon, { Legend } from './InfoIcon';
 import { getToolColor as getToolToken, IDENTITY, FONT } from '../lib/style-tokens';
+
+/**
+ * Display-window sizing for the live heatmap. Returns a totalMs that:
+ *   - is at least 60s (so very short turns don't render as a tiny strip)
+ *   - always leaves ~30s of future runway ahead of the playhead so the
+ *     cursor visibly moves through the strip instead of snapping back
+ *     when the scale extends.
+ *
+ * Effective cursor position = elapsed / displayMs, asymptotic to 100%
+ * but never reaching it — the strip extends gracefully as time passes.
+ */
+function getDisplayMs(elapsedMs) {
+  return Math.max(60_000, elapsedMs + 30_000);
+}
+
+/**
+ * Tick a `now` state at `intervalMs` while `isActive` so callers can
+ * recompute elapsed-based positions on every tick. Cleans up the
+ * interval on unmount or when isActive flips false.
+ */
+function useTickingNow(isActive, intervalMs = 250) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isActive) return undefined;
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [isActive, intervalMs]);
+  return now;
+}
 
 // Adapter: the existing layout code expects a hex string; the style-tokens
 // helper returns a palette entry. Keep this thin so we don't carry tool/color
@@ -45,7 +74,9 @@ function buildScaleTicks(totalMs) {
 export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
   const events = liveSession?._currentTurnEvents || [];
   const turnStart = liveSession?._currentTurnStartTs;
-  const isActive = liveSession && (events.length > 0 || turnStart);
+  const isActive = !!(liveSession && (events.length > 0 || turnStart));
+
+  const now = useTickingNow(isActive, 250);
 
   const filtered = useMemo(() => {
     if (!sessionId) return [];
@@ -68,9 +99,14 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
     <div className="space-y-1.5">
       <p>
         Heatmap density of the in-flight turn. Each cell is a time bucket;
-        cyan intensity = how many tool calls fired in that bucket. Open
-        the Turns tab and expand a row to see the per-call lollipop view.
+        cyan intensity = how many tool calls fired in that bucket.
       </p>
+      <p>
+        The pulsing vertical line is the live playhead, sweeping right as
+        the turn elapses. The strip's right edge stays ~30s ahead of "now"
+        so the playhead always has runway.
+      </p>
+      <p>Open the Turns tab and expand a row to see the per-call lollipop view.</p>
       <div className="flex flex-wrap gap-x-1 gap-y-0.5">
         <Legend color={IDENTITY.runtime.bg} label="tool activity" />
       </div>
@@ -89,12 +125,12 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
     );
   }
 
-  const now = Date.now();
   const start = turnStart || timelineEvents[0].ts;
   const elapsed = Math.max(now - start, 1);
+  const displayMs = getDisplayMs(elapsed);
   const totalToolMs = timelineEvents.reduce((s, e) => s + (e.durationMs || 0), 0);
   const modelMs = Math.max(0, elapsed - totalToolMs);
-  const ticks = buildScaleTicks(elapsed);
+  const ticks = buildScaleTicks(displayMs);
   const lastTool = timelineEvents[timelineEvents.length - 1]?.tool;
   const lastColor = getToolColor(lastTool);
 
@@ -120,14 +156,23 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
           <InfoIcon>{infoContent}</InfoIcon>
         </div>
       </div>
-      <HeatmapStrip events={timelineEvents} startTs={start} totalMs={elapsed} ticks={ticks} />
-      <ScaleLabels ticks={ticks} totalMs={elapsed} />
+      <HeatmapStrip
+        events={timelineEvents}
+        startTs={start}
+        totalMs={displayMs}
+        elapsedMs={elapsed}
+        ticks={ticks}
+      />
+      <ScaleLabels ticks={ticks} totalMs={displayMs} />
     </div>
   );
 }
 
-function HeatmapStrip({ events, startTs, totalMs, ticks }) {
+function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks }) {
   const HEIGHT = 28;
+  const playheadPct = elapsedMs != null
+    ? Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100))
+    : null;
 
   const buckets = useMemo(() => {
     let bucketMs;
@@ -190,6 +235,41 @@ function HeatmapStrip({ events, startTs, totalMs, ticks }) {
             style={{ left: `${t.pct}%`, height: `${HEIGHT}px` }}
           />
         ))}
+        {/* Playhead — vertical cursor tracking elapsed time. Smooth-transitioned
+            on left% so the 250ms tick rate doesn't show as visible jumps. */}
+        {playheadPct != null && (
+          <>
+            <div
+              className="absolute top-0 pointer-events-none"
+              style={{
+                left: `${playheadPct}%`,
+                height: `${HEIGHT}px`,
+                width: '2px',
+                marginLeft: '-1px',
+                background: 'linear-gradient(to bottom, rgba(34,211,238,0.95), rgba(34,211,238,0.55))',
+                boxShadow: '0 0 6px rgba(34,211,238,0.65)',
+                transition: 'left 240ms linear',
+                zIndex: 2,
+              }}
+              title={`Now · t = ${Math.round((elapsedMs ?? 0) / 1000)}s`}
+            />
+            <div
+              className="absolute pointer-events-none animate-pulse-dot"
+              style={{
+                left: `${playheadPct}%`,
+                top: '-2px',
+                width: '6px',
+                height: '6px',
+                marginLeft: '-3px',
+                background: '#22d3ee',
+                borderRadius: '50%',
+                boxShadow: '0 0 4px rgba(34,211,238,0.9)',
+                transition: 'left 240ms linear',
+                zIndex: 3,
+              }}
+            />
+          </>
+        )}
       </div>
     </div>
   );
