@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
-import InfoIcon, { Legend } from './InfoIcon';
-import { getToolColor as getToolToken, IDENTITY, VIZ, FONT } from '../lib/style-tokens';
+import InfoIcon from './InfoIcon';
+import { getToolColor as getToolToken, IDENTITY, VIZ } from '../lib/style-tokens';
 
 /**
  * Display-window sizing for the live heatmap. Returns a totalMs that:
@@ -71,6 +71,15 @@ function buildScaleTicks(totalMs) {
   return ticks;
 }
 
+function LegendRow({ color, label, tools }) {
+  return (
+    <div className="flex items-start gap-1.5 leading-tight">
+      <span className={`inline-block w-2 h-2 rounded-full shrink-0 mt-[3px] ${color}`} />
+      <span><span className="text-gray-200 font-medium">{label}</span> <span className="text-gray-500">— {tools}</span></span>
+    </div>
+  );
+}
+
 export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
   const events = liveSession?._currentTurnEvents || [];
   const turnStart = liveSession?._currentTurnStartTs;
@@ -96,22 +105,24 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
   }, [events, filtered]);
 
   const infoContent = (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       <p>
-        Activity strip for the in-flight turn. Each cell is a time bucket
-        colored by the dominant tool category — brighter = more calls.
-        Dark gaps = model thinking time.
+        Each cell is a time bucket colored by the dominant tool category.
+        Brighter = more calls. Dark gaps = LLM thinking.
       </p>
-      <p>
-        The pulsing line is the live playhead. The strip extends ~30s
-        ahead so the playhead always has runway.
-      </p>
-      <div className="flex flex-wrap gap-x-1 gap-y-0.5">
-        <Legend color={IDENTITY.fileio.bg} label={IDENTITY.fileio.label} />
-        <Legend color={IDENTITY.runtime.bg} label={IDENTITY.runtime.label} />
-        <Legend color={IDENTITY.orchestration.bg} label={IDENTITY.orchestration.label} />
-        <Legend color={IDENTITY.meta.bg} label={IDENTITY.meta.label} />
+      <div className="space-y-0.5">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Cell colors</div>
+        <LegendRow color={IDENTITY.fileio.bg} label={IDENTITY.fileio.label} tools="Read, Write, Edit, NotebookEdit" />
+        <LegendRow color={IDENTITY.runtime.bg} label={IDENTITY.runtime.label} tools="Bash, WebFetch, WebSearch" />
+        <LegendRow color={IDENTITY.orchestration.bg} label={IDENTITY.orchestration.label} tools="Grep, Glob, Agent, Task, Skill, Plan" />
+        <LegendRow color={IDENTITY.meta.bg} label={IDENTITY.meta.label} tools="ToolSearch, AskUserQuestion" />
+        <LegendRow color="bg-gray-950 border border-gray-700" label="Dark / empty" tools="LLM thinking (no tool running)" />
+        <LegendRow color={VIZ.activity.bg} label="Green line" tools="Live playhead (current time)" />
       </div>
+      <p className="text-gray-500 text-[10px]">
+        MCP tools (mcp__*) are mapped by action name. Unknown tools → Meta.
+        Hover any cell for per-bucket details.
+      </p>
     </div>
   );
 
@@ -176,59 +187,70 @@ function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks }) {
     ? Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100))
     : null;
 
-  const buckets = useMemo(() => {
-    let bucketMs;
-    if (totalMs <= 30_000) bucketMs = 1_000;
-    else if (totalMs <= 60_000) bucketMs = 2_000;
-    else if (totalMs <= 180_000) bucketMs = 5_000;
-    else if (totalMs <= 600_000) bucketMs = 15_000;
-    else bucketMs = 30_000;
+  const segments = useMemo(() => {
+    if (events.length === 0) return [];
 
-    const numBuckets = Math.max(1, Math.ceil(totalMs / bucketMs));
-    const arr = Array.from({ length: numBuckets }, (_, i) => ({
-      startSec: (i * bucketMs) / 1000,
-      endSec: Math.min(((i + 1) * bucketMs) / 1000, totalMs / 1000),
-      count: 0,
-      totalMs: 0,
-      tools: {},
-    }));
-    for (const e of events) {
-      const eventStart = e.ts - (e.durationMs || 0);
-      const offset = eventStart - startTs;
-      const idx = Math.min(numBuckets - 1, Math.max(0, Math.floor(offset / bucketMs)));
-      arr[idx].count += 1;
-      arr[idx].totalMs += e.durationMs || 0;
-      arr[idx].tools[e.tool] = (arr[idx].tools[e.tool] || 0) + 1;
+    const intervals = events
+      .map(e => ({
+        startMs: (e.ts - (e.durationMs || 0)) - startTs,
+        endMs: e.ts - startTs,
+        tool: e.tool,
+        durationMs: e.durationMs || 0,
+      }))
+      .sort((a, b) => a.startMs - b.startMs);
+
+    const segs = [];
+    let cursor = 0;
+
+    for (const iv of intervals) {
+      const toolStart = Math.max(0, iv.startMs);
+      if (toolStart > cursor) {
+        segs.push({ type: 'gap', startMs: cursor, endMs: toolStart, durationMs: toolStart - cursor });
+      }
+      segs.push({ type: 'tool', startMs: toolStart, endMs: Math.max(toolStart + 1, iv.endMs), tool: iv.tool, durationMs: iv.durationMs });
+      cursor = Math.max(cursor, iv.endMs);
     }
-    return arr;
-  }, [events, startTs, totalMs]);
 
-  const maxCount = Math.max(...buckets.map(b => b.count), 1);
+    const displayEnd = Math.max(elapsedMs || 0, totalMs);
+    if (cursor < displayEnd) {
+      segs.push({ type: 'gap', startMs: cursor, endMs: displayEnd, durationMs: displayEnd - cursor });
+    }
+
+    return segs;
+  }, [events, startTs, totalMs, elapsedMs]);
 
   return (
     <div className="mt-1.5">
       <div className="relative w-full bg-gray-950/40 rounded-sm overflow-hidden" style={{ height: `${HEIGHT}px` }}>
-        {/* Cells — colored by dominant tool category */}
-        <div className="flex w-full gap-px h-full">
-          {buckets.map((b, i) => {
-            const intensity = b.count === 0 ? 0.04 : 0.18 + (b.count / maxCount) * 0.82;
-            const toolList = Object.entries(b.tools).map(([t, n]) => `${t}×${n}`).join(', ');
-            const dominant = b.count > 0
-              ? Object.entries(b.tools).reduce((best, cur) => cur[1] > best[1] ? cur : best, ['', 0])[0]
-              : null;
-            const catColor = dominant ? getToolToken(dominant) : VIZ.activity;
-            const tip = b.count === 0
-              ? `${b.startSec.toFixed(0)}–${b.endSec.toFixed(0)}s: model thinking`
-              : `${b.startSec.toFixed(0)}–${b.endSec.toFixed(0)}s: ${b.count} call${b.count === 1 ? '' : 's'} (${toolList}), ${formatDuration(b.totalMs)} tool time`;
+        {/* Segments — width proportional to duration */}
+        <div className="flex w-full h-full">
+          {segments.map((seg, i) => {
+            const widthPct = ((seg.endMs - seg.startMs) / totalMs) * 100;
+            if (seg.type === 'gap') {
+              const startSec = (seg.startMs / 1000).toFixed(0);
+              const endSec = (seg.endMs / 1000).toFixed(0);
+              return (
+                <div
+                  key={i}
+                  className="h-full transition-opacity hover:opacity-80"
+                  style={{ width: `${widthPct}%`, backgroundColor: 'rgba(30, 30, 40, 0.5)', minWidth: widthPct > 0.3 ? '1px' : '0' }}
+                  title={`${startSec}–${endSec}s: model thinking (${formatDuration(seg.durationMs)})`}
+                />
+              );
+            }
+            const catColor = getToolToken(seg.tool);
+            const startSec = (seg.startMs / 1000).toFixed(1);
+            const endSec = (seg.endMs / 1000).toFixed(1);
             return (
               <div
                 key={i}
-                className="flex-1 transition-opacity hover:opacity-80"
+                className="h-full transition-opacity hover:opacity-80"
                 style={{
-                  backgroundColor: `${catColor.hex}${Math.round(intensity * 255).toString(16).padStart(2, '0')}`,
+                  width: `${widthPct}%`,
+                  backgroundColor: `${catColor.hex}cc`,
                   minWidth: '2px',
                 }}
-                title={tip}
+                title={`${startSec}–${endSec}s: ${seg.tool} (${formatDuration(seg.durationMs)})`}
               />
             );
           })}
