@@ -59,7 +59,7 @@ export default function CurrentSession({ session, liveSession, displayMode = 'co
             Session <InfoIcon>
               <div className="space-y-1.5">
                 <p>Live session metrics from Claude Code hooks. {isTokenMode ? 'Token counts accumulate' : 'Cost accumulates'} across API calls.</p>
-                <div className="flex flex-wrap gap-x-1 gap-y-0.5"><Legend color="bg-accent" label="model" /><Legend color="bg-green" label={isTokenMode ? 'tokens' : 'cost'} /><Legend color="bg-cyan" label="tools" /><Legend color="bg-amber" label="lines" /></div>
+                <div className="flex flex-wrap gap-x-1 gap-y-0.5"><Legend color="bg-accent" label="model" /><Legend color="bg-green" label={isTokenMode ? 'tokens' : 'cost'} /><Legend color="bg-gray-300" label="tools" /><Legend color="bg-amber" label="lines" /></div>
               </div>
             </InfoIcon>
           </span>
@@ -79,9 +79,9 @@ export default function CurrentSession({ session, liveSession, displayMode = 'co
 
           {turnCount > 0 && <Stat label="Turn" value={turnCount.toString()} color="text-gray-300" tooltip="Number of completed turns (Claude responses) in this session" />}
           {hasDuration && <Stat label="Duration" value={formatDuration(effectiveDurationMs)} tooltip="Total elapsed time since the session started" />}
-          {toolCount > 0 && <Stat label="Tools" value={toolCount.toString()} color="text-cyan" tooltip="Number of tool calls tracked via PostToolUse hooks" />}
+          {toolCount > 0 && <Stat label="Tools" value={toolCount.toString()} color="text-gray-300" tooltip="Number of tool calls tracked via PostToolUse hooks" />}
           {lastTool && <Stat label="Last Tool" value={formatToolName(lastTool)} tooltip="Most recent tool call in this session" />}
-          {activeSubagents > 0 && <Stat label="Agents" value={activeSubagents.toString()} color="text-cyan" tooltip="Number of active subagents (Task tool spawns)" />}
+          {activeSubagents > 0 && <Stat label="Agents" value={activeSubagents.toString()} color="text-green" tooltip="Number of active subagents (Task tool spawns)" />}
           {hasLines && <Stat label="Lines" value={`+${linesAdded}/-${linesRemoved}`} color="text-amber" tooltip="Lines added and removed by Claude in this session" />}
         </div>
       </div>

@@ -124,7 +124,7 @@ function DetailPanel({ agent, isActive }) {
         {agent.endedAt && <><span>—</span><span title="End time">{formatTime(agent.endedAt)}</span></>}
         {totalTokens > 0 && (
           <span title={`Input: ${formatTokens(tokens.input)} | Output: ${formatTokens(tokens.output)} | Cache Read: ${formatTokens(tokens.cacheRead)} | Cache Write: ${formatTokens(tokens.cacheWrite)}`}>
-            <span className="text-blue">{formatTokens(tokens.input)}</span> in / <span className="text-green">{formatTokens(tokens.output)}</span> out
+            <span className="text-gray-300">{formatTokens(tokens.input)}</span> in / <span className="text-green">{formatTokens(tokens.output)}</span> out
           </span>
         )}
         {agent.turns > 0 && <span title="Number of model turns">{agent.turns} turns</span>}
@@ -217,7 +217,7 @@ export default function AgentActivity({ liveSession }) {
         <HeaderSep />
 
         <div className="flex items-center gap-3">
-          <HeaderStat value={activeEntries.length} label="active" color="text-cyan" title="Currently running agents" />
+          <HeaderStat value={activeEntries.length} label="active" color="text-green" title="Currently running agents" />
           <HeaderStat value={totalCompleted} label="done" color="text-gray-400" title={`${totalCompleted} completed agents this session`} />
         </div>
 
@@ -419,7 +419,7 @@ function ActiveAgentRow({ agentId, agent, expanded, onToggle }) {
           {formatDuration(elapsed * 1000)}
         </td>
         <td className="py-1.5 pr-2 text-right align-middle whitespace-nowrap" title={`${toolCount} tool calls${lastTool ? ` (most recent: ${lastTool})` : ''}`}>
-          <span className="text-blue">{toolCount}</span>
+          <span className="text-gray-300">{toolCount}</span>
           {lastTool && <span className="text-gray-600 text-[10px] ml-0.5">({lastTool})</span>}
         </td>
         <td className="py-1.5 pl-2 align-top">

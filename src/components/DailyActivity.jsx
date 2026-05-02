@@ -143,9 +143,9 @@ export default function DailyActivity({ stats, displayMode = 'cost' }) {
             iconSize={8}
             wrapperStyle={{ fontSize: 11, color: '#8888a0' }}
           />
-          <Bar dataKey="Messages" fill="#8b5cf6" radius={[2, 2, 0, 0]} />
-          <Bar dataKey="Sessions" fill="#60a5fa" radius={[2, 2, 0, 0]} />
-          <Bar dataKey="Tools" fill="#22d3ee" radius={[2, 2, 0, 0]} />
+          <Bar dataKey="Messages" fill="#34d399" radius={[2, 2, 0, 0]} />
+          <Bar dataKey="Sessions" fill="#fbbf24" radius={[2, 2, 0, 0]} />
+          <Bar dataKey="Tools" fill="#aaaabb" radius={[2, 2, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </Panel>

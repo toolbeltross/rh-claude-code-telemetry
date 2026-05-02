@@ -2,15 +2,15 @@ import { useState, useMemo, useEffect } from 'react';
 import InfoIcon, { Legend } from './InfoIcon';
 
 const ERROR_CLASS_COLORS = {
-  not_found: 'text-blue',
+  not_found: 'text-gray-400',
   permission: 'text-amber',
-  size_limit: 'text-accent',
-  timeout: 'text-cyan',
-  network: 'text-cyan',
+  size_limit: 'text-amber',
+  timeout: 'text-red',
+  network: 'text-red',
   validation: 'text-amber',
   suggestion: 'text-green',
-  config: 'text-cyan',
-  orphan: 'text-accent',
+  config: 'text-amber',
+  orphan: 'text-red',
   other: 'text-gray-400',
 };
 
@@ -22,11 +22,11 @@ function formatCost(cost) {
 
 const TOOL_COLORS = {
   Read: 'text-blue',
-  Write: 'text-green',
-  Edit: 'text-amber',
-  Bash: 'text-red',
-  Glob: 'text-cyan',
-  Grep: 'text-cyan',
+  Write: 'text-blue',
+  Edit: 'text-blue',
+  Bash: 'text-cyan',
+  Glob: 'text-accent',
+  Grep: 'text-accent',
   Agent: 'text-accent',
 };
 
