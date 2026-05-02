@@ -8,6 +8,7 @@ import SessionList from './components/SessionList';
 import SessionMetaStrip from './components/SessionMetaStrip';
 import MicroDashboard from './components/MicroDashboard';
 import { StatusLineModal } from './components/StatusLineBanner';
+import PlanUsage from './components/PlanUsage';
 import { MODEL_COLORS } from './lib/model-colors';
 
 const MICRO_THRESHOLD = 480;
@@ -42,38 +43,6 @@ function relativeTime(ms) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
-}
-
-function ToolBeltIcon({ size = 22 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 61 61" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M30.1388 0C13.4942 0 0 13.6158 0 30.4105C0 42.6353 7.15297 53.1696 17.4644 57.9988L22.789 32.7784C22.9135 32.0486 23.1707 30.824 23.3636 29.9036C23.7132 28.2533 22.2666 27.041 20.8481 27.0491L15.9254 27.1464C15.0815 27.1464 14.0407 28.0384 13.5183 28.6385C12.8552 29.4008 11.9551 29.8996 10.9504 29.9077C8.901 29.9239 7.88432 29.9117 7.88432 29.9117C9.15013 23.5782 17.7417 18.2706 25.7024 18.2138L36.685 18.1652C36.9623 18.1652 37.2355 18.3274 37.3079 18.599C37.6936 20.0912 39.4417 20.4156 42.7652 20.4075L45.61 20.3345L45.8672 19.0734C45.9957 18.449 46.5423 17.9989 47.1735 17.9989H51.067C51.9111 17.9989 52.5459 18.7815 52.3774 19.6127L50.581 28.5534C50.4564 29.1819 49.9058 29.632 49.271 29.632H45.3448C44.4972 29.632 43.866 28.8494 44.0389 28.0141L44.2477 26.9923L40.6153 27.0572C35.6161 27.2113 34.6315 30.0253 34.077 32.7744L28.2502 60.756C28.877 60.7967 29.5079 60.8211 30.1429 60.8211C46.7873 60.8211 60.2818 47.2051 60.2818 30.4105C60.2778 13.6158 46.7833 0 30.1388 0Z" fill="#FCCD0A"/>
-    </svg>
-  );
-}
-
-function LogoModal({ onClose }) {
-  useEffect(() => {
-    function handleKey(e) { if (e.key === 'Escape') onClose(); }
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/70" />
-      <div className="relative bg-gray-900 border border-gray-700 rounded-xl p-8 shadow-2xl max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-3 right-3 text-gray-500 hover:text-gray-300 transition-colors" title="Close">
-          <CloseIcon size={16} />
-        </button>
-        <div className="flex flex-col items-center gap-4">
-          <img src="/toolbelt-logo.png" alt="ToolBelt" className="w-64 h-auto" />
-          <p className="text-gray-400 text-xs text-center">Claude Code Telemetry Dashboard</p>
-          <a href="https://www.toolbelt.work" target="_blank" rel="noopener noreferrer" className="text-accent text-xs hover:underline">www.toolbelt.work</a>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function RefreshIcon({ size = 14 }) {
@@ -194,7 +163,6 @@ export default function App() {
   const [showSessionList, setShowSessionList] = useState(false);
   const [hasAutoSelected, setHasAutoSelected] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [logoModalOpen, setLogoModalOpen] = useState(false);
   const [statusLineModalOpen, setStatusLineModalOpen] = useState(false);
   const prevSessionIdsRef = useRef([]);
   const overflowRef = useRef(null);
@@ -397,23 +365,15 @@ export default function App() {
 
   const dashboardContent = (
     <div className="min-h-screen bg-gray-950 p-3">
-      {/* Logo modal */}
-      {logoModalOpen && <LogoModal onClose={() => setLogoModalOpen(false)} />}
       {/* StatusLine modal — opened from the health dot in icon strip */}
       {statusLineModalOpen && <StatusLineModal statusLineState={data.statusLineState} onClose={() => setStatusLineModalOpen(false)} />}
 
       {/* Header */}
       <header className="flex items-center justify-between mb-2 px-2">
-        {/* Logo + model legend */}
-        <div className="flex items-center gap-3">
-          <button onClick={() => setLogoModalOpen(true)} title="Claude Code Telemetry — click for info" className="cursor-pointer hover:opacity-80 transition-opacity">
-            <ToolBeltIcon size={24} />
-          </button>
-          {/* Model color legend — hidden below lg (1024px) to prevent collision
-              with the right-side icon strip. On narrower windows the same
-              color language is still present via ModelBreakdownMini and the
-              per-session meta strip. */}
-          <div className="hidden lg:flex items-center gap-2.5">
+        {/* Plan usage + model legend */}
+        <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
+          <PlanUsage planInfo={data.planInfo} inline />
+          <div className="hidden lg:flex items-center gap-2.5 shrink-0">
             {Object.entries(MODEL_COLORS).map(([name, mc]) => (
               <span key={name} className={`inline-flex items-center gap-1 text-[11px] ${mc.text}`} title={`${name} model`}>
                 <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: mc.hex }} />

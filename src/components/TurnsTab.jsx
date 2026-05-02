@@ -209,23 +209,24 @@ function TurnDetail({ turn }) {
 
 function LollipopView({ events, startTs, totalMs }) {
   const HEIGHT = 80;
+  const LABEL_SPACE = 12;
   const maxDuration = Math.max(...events.map(e => e.durationMs || 0), 1000);
   const ticks = buildScaleTicks(totalMs);
 
   return (
     <div className="px-3 py-2">
-      <div className="relative w-full bg-gray-950/50 rounded" style={{ height: `${HEIGHT + 6}px` }}>
+      <div className="relative w-full bg-gray-950/50 rounded" style={{ height: `${HEIGHT + LABEL_SPACE + 6}px` }}>
         {/* Tick marks */}
         {ticks.map((t, i) => (
           <div
             key={`tick-${i}`}
-            className="absolute bottom-0 w-px bg-gray-700/30 pointer-events-none"
-            style={{ left: `${t.pct}%`, height: `${HEIGHT}px` }}
+            className="absolute w-px bg-gray-700/30 pointer-events-none"
+            style={{ left: `${t.pct}%`, bottom: 0, height: `${HEIGHT}px` }}
           />
         ))}
         {/* Baseline */}
-        <div className="absolute left-0 right-0 bottom-1 h-px bg-gray-700/60" />
-        {/* Stems with dots */}
+        <div className="absolute left-0 right-0 h-px bg-gray-700/60" style={{ bottom: '4px' }} />
+        {/* Stems with dots and numbers */}
         {events.map((e, i) => {
           const eventEnd = e.ts;
           const eventStart = eventEnd - (e.durationMs || 0);
@@ -237,15 +238,15 @@ function LollipopView({ events, startTs, totalMs }) {
           const color = getToolColor(e.tool);
           const failed = e.success === false;
           const offsetSec = ((eventStart - startTs) / 1000).toFixed(1);
-          const tip = `${e.tool}: ${formatDuration(e.durationMs)} at +${offsetSec}s${e.agentId ? ` (agent ${e.agentId.slice(0, 8)})` : ''}${failed ? ' — FAILED' : ''}`;
+          const tip = `#${i + 1} ${e.tool}\n${formatDuration(e.durationMs)} at +${offsetSec}s${e.agentId ? `\nAgent: ${e.agentId.slice(0, 8)}` : ''}${failed ? '\nFAILED' : ''}`;
 
           return (
             <div
               key={i}
               className="absolute group"
               style={{ left: `${xPct}%`, bottom: '4px', transform: 'translateX(-50%)' }}
-              title={tip}
             >
+              {/* Stem */}
               <div
                 className="opacity-60 group-hover:opacity-100 transition-opacity"
                 style={{
@@ -255,8 +256,9 @@ function LollipopView({ events, startTs, totalMs }) {
                   marginLeft: '2.25px',
                 }}
               />
+              {/* Pin head */}
               <div
-                className="absolute rounded-full opacity-90 group-hover:opacity-100 transition-opacity"
+                className="absolute rounded-full opacity-90 group-hover:opacity-100 group-hover:scale-150 transition-all cursor-default"
                 style={{
                   width: '6px',
                   height: '6px',
@@ -265,7 +267,20 @@ function LollipopView({ events, startTs, totalMs }) {
                   left: '0',
                   boxShadow: failed ? '0 0 0 1.5px rgba(248, 113, 113, 0.7)' : 'none',
                 }}
+                title={tip}
               />
+              {/* Number label above pin */}
+              <span
+                className="absolute text-[8px] font-mono text-gray-500 group-hover:text-gray-300 transition-colors select-none pointer-events-none"
+                style={{
+                  bottom: `${stemHeight + 2}px`,
+                  left: '3px',
+                  transform: 'translateX(-50%)',
+                  lineHeight: 1,
+                }}
+              >
+                {i + 1}
+              </span>
             </div>
           );
         })}
