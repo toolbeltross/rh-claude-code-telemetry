@@ -10,7 +10,6 @@ import TurnCostChart from './TurnCostChart';
 import TurnHeartbeat from './TurnHeartbeat';
 import TurnsTab from './TurnsTab';
 import CurrentPrompt from './CurrentPrompt';
-import PlanUsage from './PlanUsage';
 import TaskCompletions from './TaskCompletions';
 
 const TABS = ['Agents', 'Tools', 'Turns', 'Failures', 'Details'];
@@ -70,10 +69,7 @@ export default function SessionTab({ sessionId, liveSession, session, toolEvents
       {/* Row 1b: Live Turn Heartbeat — shows current turn's tool activity */}
       <TurnHeartbeat liveSession={liveSession} toolEvents={toolEvents} sessionId={sessionId} />
 
-      {/* Row 2: Plan Usage — Max users only */}
-      <PlanUsage planInfo={planInfo} />
-
-      {/* Row 3: Tabbed subpanel */}
+      {/* Row 2: Tabbed subpanel */}
       <div className="flex flex-col">
         {/* Tab bar */}
         <div className="flex items-end gap-1">
