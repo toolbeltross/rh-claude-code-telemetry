@@ -80,12 +80,15 @@ function reducer(state, action) {
             ...sess,
             _currentPrompt: prompt,
             _promptHistory: history || sess._promptHistory,
-            // Stamp client-side so the heartbeat can detect "between turns"
-            // without waiting for the next statusLine refresh to carry these
-            // fields over from the server-side session.
+            // Stamp lifecycle timestamps client-side so the heartbeat can
+            // detect "between turns" without waiting for the next statusLine
+            // refresh. Do NOT clear _currentTurnEvents here — the server's
+            // updatePrompt clears it server-side, and the next LIVE_SESSION
+            // dispatch carries the empty array through. Clearing client-side
+            // creates a brief flicker between this dispatch and the next
+            // statusLine refresh that's especially visible in auto mode.
             _lastUserPromptAt: now,
             _currentTurnStartTs: now,
-            _currentTurnEvents: [],
           },
         },
         // User submitted a new prompt = session is now processing

@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import InfoIcon from './InfoIcon';
 import { getToolColor as getToolToken, IDENTITY, VIZ } from '../lib/style-tokens';
+import { getModelColor } from '../lib/model-colors';
 
 /**
  * Display-window sizing for the live heatmap. Returns a totalMs that:
@@ -85,11 +86,18 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
   const turnStart = liveSession?._currentTurnStartTs;
   const lastStopAt = liveSession?._lastStopAt || 0;
   const lastUserPromptAt = liveSession?._lastUserPromptAt || 0;
-  // "Between turns" = Stop fired more recently than the last UserPromptSubmit,
-  // i.e. the session is in blue-dot idle (waiting on the user). When this is
-  // true the heartbeat renders an idle band from lastStopAt to now instead of
-  // collapsing post-Stop time into the same dark void as inter-tool gaps.
-  const isBetweenTurns = lastStopAt > 0 && lastStopAt >= lastUserPromptAt;
+  // "Between turns" = Stop fired more recently than the last UserPromptSubmit
+  // AND no tool events have arrived since Stop. The tool-events-since-stop
+  // check matters for auto-mode (Claude continues without an intervening
+  // UserPromptSubmit) and for forced-continuation cycles (Layer 3a rejection
+  // forces another tool call after Stop). In both cases the session is still
+  // active even though Stop fired — we only want to render the idle band when
+  // the session is genuinely waiting on the user.
+  const hasToolActivitySinceStop = lastStopAt > 0
+    && (toolEvents || []).some(e => e.session === sessionId && e.timestamp > lastStopAt);
+  const isBetweenTurns = lastStopAt > 0
+    && lastStopAt >= lastUserPromptAt
+    && !hasToolActivitySinceStop;
   const isActive = !!(liveSession && (events.length > 0 || turnStart));
 
   const now = useTickingNow(isActive, 250);
@@ -126,6 +134,9 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
         <LegendRow color="bg-gray-950 border border-gray-700" label="Dark / empty" tools="LLM thinking (no tool running, turn still active)" />
         <LegendRow color={VIZ.idle.bg} label="Blue fill" tools="User-waiting idle (turn ended, awaiting next prompt)" />
         <LegendRow color={VIZ.subagent.bg} label="Top stripe" tools="Tool fired inside a subagent thread (agentId set)" />
+        <LegendRow color={VIZ.compaction.bg} label="Amber vertical" tools="Compaction event (context summarized at this point)" />
+        <LegendRow color={VIZ.forcedContinuation.bg} label="Red vertical + ▼" tools="Layer 3a rejection forced Claude to retry" />
+        <LegendRow color="bg-accent" label="Dashed vertical" tools="Model switch — colored by destination model (Opus / Sonnet / Haiku)" />
         <LegendRow color={VIZ.activity.bg} label="Green line" tools="Live playhead (current time)" />
       </div>
       <p className="text-gray-500 text-[10px]">
@@ -227,17 +238,46 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
         elapsedMs={elapsed}
         ticks={ticks}
         idleStartMs={isBetweenTurns ? Math.max(0, lastStopAt - start) : null}
+        compactEvents={liveSession?._compactEvents || []}
+        forcedContinuations={liveSession?._forcedContinuations || []}
+        modelSwitches={liveSession?._modelSwitches || []}
       />
       <ScaleLabels ticks={ticks} totalMs={displayMs} />
     </div>
   );
 }
 
-function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks, idleStartMs = null }) {
+function HeatmapStrip({
+  events,
+  startTs,
+  totalMs,
+  elapsedMs,
+  ticks,
+  idleStartMs = null,
+  compactEvents = [],
+  forcedContinuations = [],
+  modelSwitches = [],
+}) {
   const HEIGHT = 28;
   const playheadPct = elapsedMs != null
     ? Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100))
     : null;
+
+  // Filter event markers to those that fall inside the visible turn window.
+  // Each list uses a different timestamp field name on its records.
+  const inWindow = (ts) => ts >= startTs && (ts - startTs) <= totalMs;
+  const compactionMarkers = useMemo(
+    () => (compactEvents || []).filter(c => c?.ts && inWindow(c.ts)),
+    [compactEvents, startTs, totalMs]
+  );
+  const forcedMarkers = useMemo(
+    () => (forcedContinuations || []).filter(f => f?.ts && inWindow(f.ts)),
+    [forcedContinuations, startTs, totalMs]
+  );
+  const switchMarkers = useMemo(
+    () => (modelSwitches || []).filter(m => m?.ts && inWindow(m.ts)),
+    [modelSwitches, startTs, totalMs]
+  );
 
   const segments = useMemo(() => {
     if (events.length === 0) return [];
@@ -353,6 +393,82 @@ function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks, idleStartMs 
             style={{ left: `${t.pct}%`, height: `${HEIGHT}px` }}
           />
         ))}
+        {/* Compaction markers — full-height amber lines at each compaction event */}
+        {compactionMarkers.map((c, i) => {
+          const pct = ((c.ts - startTs) / totalMs) * 100;
+          const trigger = c.trigger || 'auto';
+          return (
+            <div
+              key={`cmp-${i}`}
+              className="absolute top-0 pointer-events-none"
+              style={{
+                left: `${pct}%`,
+                height: `${HEIGHT}px`,
+                width: '1.5px',
+                marginLeft: '-0.75px',
+                backgroundColor: VIZ.compaction.hex,
+                opacity: 0.75,
+                zIndex: 1,
+              }}
+              title={`compaction (${trigger}) at +${Math.round((c.ts - startTs) / 1000)}s`}
+            />
+          );
+        })}
+        {/* Forced-continuation markers — full-height red lines with a small triangle on top */}
+        {forcedMarkers.map((f, i) => {
+          const pct = ((f.ts - startTs) / totalMs) * 100;
+          const tip = `Layer 3a rejection forced retry at +${Math.round((f.ts - startTs) / 1000)}s${f.firstTool ? ` · firstTool: ${f.firstTool}` : ''}`;
+          return (
+            <div key={`fc-${i}`} className="absolute top-0 pointer-events-none" style={{ left: `${pct}%`, height: `${HEIGHT}px`, zIndex: 1 }} title={tip}>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '2px',
+                  marginLeft: '-1px',
+                  height: `${HEIGHT}px`,
+                  backgroundColor: VIZ.forcedContinuation.hex,
+                  opacity: 0.85,
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  left: 0,
+                  marginLeft: '-3px',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '3px solid transparent',
+                  borderRight: '3px solid transparent',
+                  borderTop: `4px solid ${VIZ.forcedContinuation.hex}`,
+                }}
+              />
+            </div>
+          );
+        })}
+        {/* Model-switch markers — dashed full-height line in the destination model's color */}
+        {switchMarkers.map((m, i) => {
+          const pct = ((m.ts - startTs) / totalMs) * 100;
+          const destColor = getModelColor(m.to).hex;
+          return (
+            <div
+              key={`mw-${i}`}
+              className="absolute top-0 pointer-events-none"
+              style={{
+                left: `${pct}%`,
+                height: `${HEIGHT}px`,
+                width: 0,
+                borderLeft: `1.5px dashed ${destColor}`,
+                marginLeft: '-0.75px',
+                opacity: 0.7,
+                zIndex: 1,
+              }}
+              title={`model switched: ${m.from || '?'} → ${m.to || '?'}`}
+            />
+          );
+        })}
         {/* Playhead — vertical cursor tracking elapsed time. Smooth-transitioned
             on left% so the 250ms tick rate doesn't show as visible jumps. */}
         {playheadPct != null && (
