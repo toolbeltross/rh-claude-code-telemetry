@@ -361,6 +361,15 @@ class Store extends EventEmitter {
     data._compactEvents = existing._compactEvents || [];
     data._lastCompactAt = existing._lastCompactAt ?? null;
 
+    // Preserve lifecycle event timestamps. These are stamped by recordTurnEnd
+    // (_lastStopAt) and updatePrompt (_lastUserPromptAt). Without explicit
+    // preservation here, every statusLine refresh would wipe them — which would
+    // break the heartbeat's "between turns" detection (idle band rendering).
+    data._lastStopAt = existing._lastStopAt ?? null;
+    data._lastUserPromptAt = existing._lastUserPromptAt ?? null;
+    data._lastLifecycleEvent = existing._lastLifecycleEvent ?? null;
+    data._stopSeq = existing._stopSeq ?? 0;
+
     // Preserve subagent tracking state
     data._activeSubagents = existing._activeSubagents || {};
     data._subagentHistory = existing._subagentHistory || [];
