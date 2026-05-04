@@ -58,7 +58,7 @@ function listTests(dir) {
 const ENV_VARS_TO_SCRUB = [
   'CLAUDE_CONTEXT_WINDOW_SIZE', // affects context-window-size resolution tests
   'OVERSIGHT_LOG_PATH',          // dual-write target — could redirect log writes during integration tests
-  'CLAUDE_TELEMETRY_PORT',       // could redirect server port
+  'RH_TELEMETRY_PORT',       // could redirect server port
   'PORT',                        // generic port override
 ];
 

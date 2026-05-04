@@ -34,7 +34,7 @@
  *      { "statusLine": { "type": "command", "command": "node ~/.claude/statusline.js" } }
  *
  * Optional telemetry enrichment (line 3 with turns, tools, agents):
- *   Set CLAUDE_TELEMETRY_URL=http://localhost:7890 in your environment.
+ *   Set RH_TELEMETRY_URL=http://localhost:7890 in your environment.
  */
 'use strict';
 
@@ -79,7 +79,7 @@ async function main() {
   const raw = await readStdin();
   try {
     const input = JSON.parse(raw);
-    const TELEMETRY_URL = process.env.CLAUDE_TELEMETRY_URL;
+    const TELEMETRY_URL = process.env.RH_TELEMETRY_URL;
 
     // Fire-and-forget POST + optional snapshot GET
     let live = {};

@@ -1,5 +1,5 @@
 /**
- * Centralized configuration for rh-claude-code-telemetry.
+ * Centralized configuration for rh-telemetry.
  *
  * All hardcoded values live here. Import named constants from this module
  * instead of scattering magic numbers across the codebase.
@@ -11,7 +11,7 @@ import { homedir } from 'os';
 
 // ── Server ───────────────────────────────────────────────────────────────────
 
-export const PORT = parseInt(process.env.CLAUDE_TELEMETRY_PORT || process.env.PORT, 10) || 7890;
+export const PORT = parseInt(process.env.RH_TELEMETRY_PORT || process.env.PORT, 10) || 7890;
 export const BASE_URL = `http://localhost:${PORT}`;
 export const WS_URL = `ws://localhost:${PORT}/ws`;
 export const VITE_DEV_PORT = 5173;
@@ -48,9 +48,9 @@ export const FORCE_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
  * considered orphaned — moved to history with status:'orphaned' and logged
  * to the failure store. Catches subagents where SubagentStop never fires
  * due to compaction, parent-turn interrupt, or dropped hooks.
- * Override via CLAUDE_TELEMETRY_SUBAGENT_ORPHAN_MS env var.
+ * Override via RH_TELEMETRY_SUBAGENT_ORPHAN_MS env var.
  */
-export const SUBAGENT_ORPHAN_MS = parseInt(process.env.CLAUDE_TELEMETRY_SUBAGENT_ORPHAN_MS, 10) || 10 * 60 * 1000; // 10 minutes
+export const SUBAGENT_ORPHAN_MS = parseInt(process.env.RH_TELEMETRY_SUBAGENT_ORPHAN_MS, 10) || 10 * 60 * 1000; // 10 minutes
 
 // ── Polling / Timing ─────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-const API_PORT = process.env.CLAUDE_TELEMETRY_PORT || 7890;
+const API_PORT = process.env.RH_TELEMETRY_PORT || 7890;
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

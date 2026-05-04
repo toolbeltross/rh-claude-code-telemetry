@@ -75,7 +75,7 @@ To set up the telemetry dashboard, perform these steps:
 
 1. **Configure hooks + install skills** (enables live tool feed, validation, prompt capture, agents):
    \`\`\`bash
-   ${binCmd} setup || npx rh-claude-code-telemetry setup
+   ${binCmd} setup || npx rh-telemetry setup
    \`\`\`
    If neither command works, fall back to:
    \`\`\`bash
@@ -84,7 +84,7 @@ To set up the telemetry dashboard, perform these steps:
 
 2. **Start the dashboard server**:
    \`\`\`bash
-   ${binCmd} start --bg || npx rh-claude-code-telemetry start --bg
+   ${binCmd} start --bg || npx rh-telemetry start --bg
    \`\`\`
    Or foreground:
    \`\`\`bash

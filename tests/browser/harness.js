@@ -38,7 +38,7 @@ export async function closeBrowser() {
 
 /**
  * Run `fn(server, page)` against a freshly-spawned server and a new
- * Playwright page. Server has CLAUDE_TELEMETRY_TEST_MODE=1 so /api/_test/state
+ * Playwright page. Server has RH_TELEMETRY_TEST_MODE=1 so /api/_test/state
  * is mounted. Tmp HOME, ephemeral port, full isolation.
  *
  * Requires `npm run build` to have been run at least once so dist/ exists.
@@ -56,7 +56,7 @@ export async function withDashboard(fn) {
 
     const server = await startTestServer({
       tmpHome: home,
-      extraEnv: { CLAUDE_TELEMETRY_TEST_MODE: '1' },
+      extraEnv: { RH_TELEMETRY_TEST_MODE: '1' },
     });
 
     const browser = await getBrowser();

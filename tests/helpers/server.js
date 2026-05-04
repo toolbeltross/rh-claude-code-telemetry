@@ -1,7 +1,7 @@
 /**
  * Spawn a test telemetry server in a child process with isolated HOME.
  *
- * The server reads CLAUDE_TELEMETRY_PORT and HOME from env. Setting HOME to
+ * The server reads RH_TELEMETRY_PORT and HOME from env. Setting HOME to
  * a tmp dir means all `~/.claude/*` paths in server/config.js auto-redirect
  * into the tmp area — full isolation from the developer's live setup.
  *
@@ -26,7 +26,7 @@ const POLL_INTERVAL_MS = 100;
  * @param {object} opts
  * @param {string} opts.tmpHome - absolute path to use as HOME (must contain .claude/settings.json)
  * @param {number} [opts.port] - port to use (random free if omitted)
- * @param {object} [opts.extraEnv] - additional env vars (e.g. CLAUDE_TELEMETRY_TEST_MODE=1)
+ * @param {object} [opts.extraEnv] - additional env vars (e.g. RH_TELEMETRY_TEST_MODE=1)
  * @param {boolean} [opts.captureLogs] - if true, capture stdout/stderr to .logs[]
  * @returns {Promise<{proc, baseUrl, wsUrl, port, stop, logs}>}
  */
@@ -38,7 +38,7 @@ export async function startTestServer({ tmpHome, port, extraEnv = {}, captureLog
     ...process.env,
     HOME: tmpHome,
     USERPROFILE: tmpHome, // Windows fallback in config.js
-    CLAUDE_TELEMETRY_PORT: String(finalPort),
+    RH_TELEMETRY_PORT: String(finalPort),
     ...extraEnv,
   };
 
