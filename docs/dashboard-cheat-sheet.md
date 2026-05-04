@@ -56,6 +56,27 @@ Quick reference for every section in the Session tab, what it shows, and why it 
 
 ---
 
+## Turn Heartbeat
+**What:** Real-time strip showing tool activity within the current turn, plus the user-waiting idle period after Stop fires.
+**Why it matters:** Shows what Claude is actually spending time on. Distinct visual states tell you whether Claude is running tools, "thinking" without tools, or waiting on you.
+
+| Component | Meaning |
+|-----------|---------|
+| Colored block | Tool execution. Color = tool category (blue=File I/O, cyan=Shell/Network, purple=Orchestration, gray=Meta). Width ∝ duration. |
+| Purple top stripe (3px) | Tool fired inside a subagent thread (event has `agentId`). Stripe sits over the tool's category color so you can still tell what tool ran. |
+| Dark gap | LLM "thinking" — no tool running, turn still active. |
+| **Blue fill** | User-waiting idle — the turn ended (Stop fired), session is awaiting the next user prompt. Blue matches the idle session dot, so "blue dot mode" reads consistently. (Suppressed if tool events have arrived since Stop — auto-mode and forced-continuation cycles still read as active.) |
+| **Amber vertical line** | Compaction event — the conversation was auto-summarized at this point. Loss of detail downstream. |
+| **Red vertical line + ▼** | Layer 3a Stop-hook rejection forced Claude to retry. Tooltip names the first tool of the forced continuation. Multiple in close succession = supervisor loop. |
+| **Dashed vertical line** | Model switch event. Color of the line is the *destination* model's family color (purple Opus / blue Sonnet / cyan Haiku). |
+| Green vertical line | Live playhead (current time). |
+| Last tool badge | Color dot + tool name shown next to "TURN HEARTBEAT" — the most recently fired tool. |
+| Right-side stats | Elapsed turn time · tool execution time · model time (everything not a tool) · tool call count. |
+
+**Performance impact:** Persistent dark gaps within an active turn = LLM is generating output or waiting on a subagent. Long blue idle = session has been parked between prompts; counts against wall-clock duration but not against working time.
+
+---
+
 ## Tools (Row 3, 7 columns)
 **What:** Live feed of every tool call Claude makes, with timestamps and success/failure status.
 **Why it matters:** This is your real-time view of what Claude is doing right now. Watch for failed tools, validation blocks, and unexpected tool choices.
@@ -160,12 +181,12 @@ Quick reference for every section in the Session tab, what it shows, and why it 
 
 | Color | Meaning |
 |-------|---------|
-| Purple (#8b5cf6) | Opus model, primary highlights, agents |
-| Blue (#60a5fa) | Sonnet model, input tokens, idle sessions |
-| Cyan (#22d3ee) | Haiku model, cache tokens, active counts |
-| Green (#34d399) | Live/processing, output tokens, success, cost values |
-| Amber (#fbbf24) | Cache write, warnings, validation blocks, elevated latency |
-| Red (#f87171) | Errors, failures, critical context, high latency, expensive turns |
+| Purple (#8b5cf6) | Opus model, primary highlights, agents, **subagent stripe in heartbeat**, **dashed marker on Opus switch** |
+| Blue (#60a5fa) | Sonnet model, input tokens, idle sessions, **user-waiting idle fill in heartbeat**, **dashed marker on Sonnet switch** |
+| Cyan (#22d3ee) | Haiku model, cache tokens, active counts, **dashed marker on Haiku switch** |
+| Green (#34d399) | Live/processing, output tokens, success, cost values, heartbeat playhead |
+| Amber (#fbbf24) | Cache write, warnings, validation blocks, elevated latency, **compaction marker in heartbeat** |
+| Red (#f87171) | Errors, failures, critical context, high latency, expensive turns, **forced-continuation marker in heartbeat** |
 
 ---
 

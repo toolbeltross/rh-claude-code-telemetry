@@ -33,5 +33,5 @@ Current Gantt-bar approach replaced with user-chosen design:
 - `src/components/TurnsTab.jsx` — add richer detail view (swimlane option)
 - `server/store.js` — per-turn event data (already done)
 
-## Important: two hook-forwarder copies
-`~/.claude/settings.json` hooks point to `claude-telemetry/scripts/hook-forwarder.js` (LIVE), not this project's copy. Any hook-forwarder changes must go to BOTH files.
+## Hook-forwarder location
+`~/.claude/settings.json` hooks point to this project's `scripts/hook-forwarder.js`. The legacy duplicate clone was retired 2026-04-28 — single canonical copy.

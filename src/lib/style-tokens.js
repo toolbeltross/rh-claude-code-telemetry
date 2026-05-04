@@ -58,10 +58,31 @@
  *
  * 5. VIZ — activity visualizations (heatmaps, playheads, timelines).
  *    green  #34d399  Active processing / tool activity density
+ *    blue   #60a5fa  User-waiting idle (between Stop and next UserPromptSubmit)
+ *    accent #8b5cf6  Subagent activity overlay (top stripe on events with agentId)
+ *    amber  #fbbf24  Compaction event marker (vertical line on the heartbeat)
+ *    red    #f87171  Forced-continuation marker (Layer 3a Stop rejection forced retry)
  *
  *    The TurnHeartbeat heatmap and playhead use green because the strip
  *    represents "processing is happening" — the same semantic as the green
  *    pulsing session dot. Using cyan here would read as "Haiku model."
+ *
+ *    VIZ.idle is the same hex as STATUS.idle (the blue session dot) so
+ *    "blue dot mode" reads consistently across the dashboard: the dot, the
+ *    heartbeat fill, and any future timeline overlays all use the same color.
+ *
+ *    VIZ.subagent overlays a thin stripe on top of a tool block whose event
+ *    carries an agentId — distinguishing parent-thread tool calls from
+ *    subagent-thread tool calls without changing the underlying tool-category
+ *    color encoding.
+ *
+ *    VIZ.compaction and VIZ.forcedContinuation are vertical event markers
+ *    (instantaneous events, not durations). Their hex values match the
+ *    existing SubagentTimeline overlays and STATUS palette respectively, so
+ *    the visual language is consistent across surfaces. Model-switch markers
+ *    on the heartbeat use the destination model's color from `model-colors.js`
+ *    (Opus = accent, Sonnet = blue, Haiku = cyan) — there's no VIZ token for
+ *    model switches because the color comes from the model palette directly.
  *
  * PRIORITY WHEN COLORS COLLIDE:
  *   Model context → model palette wins
@@ -105,6 +126,34 @@ export const VIZ = {
     text: 'text-green',
     bg: 'bg-green',
     label: 'tool activity',
+  },
+  idle: {
+    hex: '#60a5fa',
+    rgba: (a) => `rgba(96, 165, 250, ${a})`,
+    text: 'text-blue',
+    bg: 'bg-blue',
+    label: 'user-waiting idle',
+  },
+  subagent: {
+    hex: '#8b5cf6',
+    rgba: (a) => `rgba(139, 92, 246, ${a})`,
+    text: 'text-accent',
+    bg: 'bg-accent',
+    label: 'subagent thread',
+  },
+  compaction: {
+    hex: '#fbbf24',
+    rgba: (a) => `rgba(251, 191, 36, ${a})`,
+    text: 'text-amber',
+    bg: 'bg-amber',
+    label: 'compaction event',
+  },
+  forcedContinuation: {
+    hex: '#f87171',
+    rgba: (a) => `rgba(248, 113, 113, ${a})`,
+    text: 'text-red',
+    bg: 'bg-red',
+    label: 'forced continuation',
   },
 };
 

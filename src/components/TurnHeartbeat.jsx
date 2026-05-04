@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import InfoIcon from './InfoIcon';
 import { getToolColor as getToolToken, IDENTITY, VIZ } from '../lib/style-tokens';
+import { getModelColor } from '../lib/model-colors';
 
 /**
  * Display-window sizing for the live heatmap. Returns a totalMs that:
@@ -83,6 +84,20 @@ function LegendRow({ color, label, tools }) {
 export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
   const events = liveSession?._currentTurnEvents || [];
   const turnStart = liveSession?._currentTurnStartTs;
+  const lastStopAt = liveSession?._lastStopAt || 0;
+  const lastUserPromptAt = liveSession?._lastUserPromptAt || 0;
+  // "Between turns" = Stop fired more recently than the last UserPromptSubmit
+  // AND no tool events have arrived since Stop. The tool-events-since-stop
+  // check matters for auto-mode (Claude continues without an intervening
+  // UserPromptSubmit) and for forced-continuation cycles (Layer 3a rejection
+  // forces another tool call after Stop). In both cases the session is still
+  // active even though Stop fired — we only want to render the idle band when
+  // the session is genuinely waiting on the user.
+  const hasToolActivitySinceStop = lastStopAt > 0
+    && (toolEvents || []).some(e => e.session === sessionId && e.timestamp > lastStopAt);
+  const isBetweenTurns = lastStopAt > 0
+    && lastStopAt >= lastUserPromptAt
+    && !hasToolActivitySinceStop;
   const isActive = !!(liveSession && (events.length > 0 || turnStart));
 
   const now = useTickingNow(isActive, 250);
@@ -108,7 +123,7 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
     <div className="space-y-2">
       <p>
         Each cell is a time bucket colored by the dominant tool category.
-        Brighter = more calls. Dark gaps = LLM thinking.
+        Brighter = more calls. Dark gaps = LLM thinking. Blue fill = waiting on the user.
       </p>
       <div className="space-y-0.5">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Cell colors</div>
@@ -116,7 +131,12 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
         <LegendRow color={IDENTITY.runtime.bg} label={IDENTITY.runtime.label} tools="Bash, WebFetch, WebSearch" />
         <LegendRow color={IDENTITY.orchestration.bg} label={IDENTITY.orchestration.label} tools="Grep, Glob, Agent, Task, Skill, Plan" />
         <LegendRow color={IDENTITY.meta.bg} label={IDENTITY.meta.label} tools="ToolSearch, AskUserQuestion" />
-        <LegendRow color="bg-gray-950 border border-gray-700" label="Dark / empty" tools="LLM thinking (no tool running)" />
+        <LegendRow color="bg-gray-950 border border-gray-700" label="Dark / empty" tools="LLM thinking (no tool running, turn still active)" />
+        <LegendRow color={VIZ.idle.bg} label="Blue fill" tools="User-waiting idle (turn ended, awaiting next prompt)" />
+        <LegendRow color={VIZ.subagent.bg} label="Top stripe" tools="Tool fired inside a subagent thread (agentId set)" />
+        <LegendRow color={VIZ.compaction.bg} label="Amber vertical" tools="Compaction event (context summarized at this point)" />
+        <LegendRow color={VIZ.forcedContinuation.bg} label="Red vertical + ▼" tools="Layer 3a rejection forced Claude to retry" />
+        <LegendRow color="bg-accent" label="Dashed vertical" tools="Model switch — colored by destination model (Opus / Sonnet / Haiku)" />
         <LegendRow color={VIZ.activity.bg} label="Green line" tools="Live playhead (current time)" />
       </div>
       <p className="text-gray-500 text-[10px]">
@@ -125,6 +145,48 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
       </p>
     </div>
   );
+
+  // Between-turn idle: events were cleared on Stop, no new prompt yet. Render
+  // a dedicated idle bar with a running timer so the user-waiting time is
+  // visually accounted for instead of disappearing into a "Waiting..." string.
+  if (isBetweenTurns && timelineEvents.length === 0) {
+    const idleMs = Math.max(0, now - lastStopAt);
+    return (
+      <div className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Turn Heartbeat
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] text-blue" title="Turn ended; session is idle waiting for the next user prompt">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue" />
+              <span className="font-mono uppercase tracking-wider">idle</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-[10px] text-gray-400">
+            <span title="Time since the most recent Stop hook fired">{formatDuration(idleMs)} waiting</span>
+            <InfoIcon>{infoContent}</InfoIcon>
+          </div>
+        </div>
+        <div className="mt-1.5">
+          <div
+            className="relative w-full rounded-sm overflow-hidden"
+            style={{ height: '28px', backgroundColor: VIZ.idle.rgba(0.18) }}
+            title={`Idle for ${formatDuration(idleMs)} — waiting for next user prompt`}
+          >
+            <div
+              className="absolute inset-y-0 left-0"
+              style={{ width: '100%', backgroundColor: VIZ.idle.rgba(0.35) }}
+            />
+            <div
+              className="absolute top-0 bottom-0 right-0"
+              style={{ width: '2px', background: `linear-gradient(to bottom, ${VIZ.activity.rgba(0.95)}, ${VIZ.activity.rgba(0.55)})`, boxShadow: `0 0 6px ${VIZ.activity.rgba(0.65)}` }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isActive || timelineEvents.length === 0) {
     return (
@@ -175,17 +237,47 @@ export default function TurnHeartbeat({ liveSession, toolEvents, sessionId }) {
         totalMs={displayMs}
         elapsedMs={elapsed}
         ticks={ticks}
+        idleStartMs={isBetweenTurns ? Math.max(0, lastStopAt - start) : null}
+        compactEvents={liveSession?._compactEvents || []}
+        forcedContinuations={liveSession?._forcedContinuations || []}
+        modelSwitches={liveSession?._modelSwitches || []}
       />
       <ScaleLabels ticks={ticks} totalMs={displayMs} />
     </div>
   );
 }
 
-function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks }) {
+function HeatmapStrip({
+  events,
+  startTs,
+  totalMs,
+  elapsedMs,
+  ticks,
+  idleStartMs = null,
+  compactEvents = [],
+  forcedContinuations = [],
+  modelSwitches = [],
+}) {
   const HEIGHT = 28;
   const playheadPct = elapsedMs != null
     ? Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100))
     : null;
+
+  // Filter event markers to those that fall inside the visible turn window.
+  // Each list uses a different timestamp field name on its records.
+  const inWindow = (ts) => ts >= startTs && (ts - startTs) <= totalMs;
+  const compactionMarkers = useMemo(
+    () => (compactEvents || []).filter(c => c?.ts && inWindow(c.ts)),
+    [compactEvents, startTs, totalMs]
+  );
+  const forcedMarkers = useMemo(
+    () => (forcedContinuations || []).filter(f => f?.ts && inWindow(f.ts)),
+    [forcedContinuations, startTs, totalMs]
+  );
+  const switchMarkers = useMemo(
+    () => (modelSwitches || []).filter(m => m?.ts && inWindow(m.ts)),
+    [modelSwitches, startTs, totalMs]
+  );
 
   const segments = useMemo(() => {
     if (events.length === 0) return [];
@@ -196,6 +288,7 @@ function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks }) {
         endMs: e.ts - startTs,
         tool: e.tool,
         durationMs: e.durationMs || 0,
+        agentId: e.agentId || null,
       }))
       .sort((a, b) => a.startMs - b.startMs);
 
@@ -207,17 +300,34 @@ function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks }) {
       if (toolStart > cursor) {
         segs.push({ type: 'gap', startMs: cursor, endMs: toolStart, durationMs: toolStart - cursor });
       }
-      segs.push({ type: 'tool', startMs: toolStart, endMs: Math.max(toolStart + 1, iv.endMs), tool: iv.tool, durationMs: iv.durationMs });
+      segs.push({
+        type: 'tool',
+        startMs: toolStart,
+        endMs: Math.max(toolStart + 1, iv.endMs),
+        tool: iv.tool,
+        durationMs: iv.durationMs,
+        agentId: iv.agentId,
+      });
       cursor = Math.max(cursor, iv.endMs);
     }
 
     const displayEnd = Math.max(elapsedMs || 0, totalMs);
     if (cursor < displayEnd) {
-      segs.push({ type: 'gap', startMs: cursor, endMs: displayEnd, durationMs: displayEnd - cursor });
+      // If Stop has fired (idleStartMs set) and falls inside the trailing gap,
+      // split the gap into a leading "thinking" portion (before Stop) and a
+      // trailing "idle" portion (after Stop). Either side may be zero-length.
+      if (idleStartMs != null && idleStartMs >= cursor && idleStartMs < displayEnd) {
+        if (idleStartMs > cursor) {
+          segs.push({ type: 'gap', startMs: cursor, endMs: idleStartMs, durationMs: idleStartMs - cursor });
+        }
+        segs.push({ type: 'idle', startMs: idleStartMs, endMs: displayEnd, durationMs: displayEnd - idleStartMs });
+      } else {
+        segs.push({ type: 'gap', startMs: cursor, endMs: displayEnd, durationMs: displayEnd - cursor });
+      }
     }
 
     return segs;
-  }, [events, startTs, totalMs, elapsedMs]);
+  }, [events, startTs, totalMs, elapsedMs, idleStartMs]);
 
   return (
     <div className="mt-1.5">
@@ -238,20 +348,40 @@ function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks }) {
                 />
               );
             }
+            if (seg.type === 'idle') {
+              const startSec = (seg.startMs / 1000).toFixed(0);
+              const endSec = (seg.endMs / 1000).toFixed(0);
+              return (
+                <div
+                  key={i}
+                  className="h-full transition-opacity hover:opacity-80"
+                  style={{ width: `${widthPct}%`, backgroundColor: VIZ.idle.rgba(0.35), minWidth: widthPct > 0.3 ? '1px' : '0' }}
+                  title={`${startSec}–${endSec}s: user-waiting idle (${formatDuration(seg.durationMs)})`}
+                />
+              );
+            }
             const catColor = getToolToken(seg.tool);
             const startSec = (seg.startMs / 1000).toFixed(1);
             const endSec = (seg.endMs / 1000).toFixed(1);
+            const inSubagent = !!seg.agentId;
             return (
               <div
                 key={i}
-                className="h-full transition-opacity hover:opacity-80"
+                className="relative h-full transition-opacity hover:opacity-80"
                 style={{
                   width: `${widthPct}%`,
                   backgroundColor: `${catColor.hex}cc`,
                   minWidth: '2px',
                 }}
-                title={`${startSec}–${endSec}s: ${seg.tool} (${formatDuration(seg.durationMs)})`}
-              />
+                title={`${startSec}–${endSec}s: ${seg.tool}${inSubagent ? ' (subagent)' : ''} (${formatDuration(seg.durationMs)})`}
+              >
+                {inSubagent && (
+                  <span
+                    className="absolute top-0 left-0 right-0 pointer-events-none"
+                    style={{ height: '3px', backgroundColor: VIZ.subagent.hex }}
+                  />
+                )}
+              </div>
             );
           })}
         </div>
@@ -263,6 +393,82 @@ function HeatmapStrip({ events, startTs, totalMs, elapsedMs, ticks }) {
             style={{ left: `${t.pct}%`, height: `${HEIGHT}px` }}
           />
         ))}
+        {/* Compaction markers — full-height amber lines at each compaction event */}
+        {compactionMarkers.map((c, i) => {
+          const pct = ((c.ts - startTs) / totalMs) * 100;
+          const trigger = c.trigger || 'auto';
+          return (
+            <div
+              key={`cmp-${i}`}
+              className="absolute top-0 pointer-events-none"
+              style={{
+                left: `${pct}%`,
+                height: `${HEIGHT}px`,
+                width: '1.5px',
+                marginLeft: '-0.75px',
+                backgroundColor: VIZ.compaction.hex,
+                opacity: 0.75,
+                zIndex: 1,
+              }}
+              title={`compaction (${trigger}) at +${Math.round((c.ts - startTs) / 1000)}s`}
+            />
+          );
+        })}
+        {/* Forced-continuation markers — full-height red lines with a small triangle on top */}
+        {forcedMarkers.map((f, i) => {
+          const pct = ((f.ts - startTs) / totalMs) * 100;
+          const tip = `Layer 3a rejection forced retry at +${Math.round((f.ts - startTs) / 1000)}s${f.firstTool ? ` · firstTool: ${f.firstTool}` : ''}`;
+          return (
+            <div key={`fc-${i}`} className="absolute top-0 pointer-events-none" style={{ left: `${pct}%`, height: `${HEIGHT}px`, zIndex: 1 }} title={tip}>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '2px',
+                  marginLeft: '-1px',
+                  height: `${HEIGHT}px`,
+                  backgroundColor: VIZ.forcedContinuation.hex,
+                  opacity: 0.85,
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  left: 0,
+                  marginLeft: '-3px',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '3px solid transparent',
+                  borderRight: '3px solid transparent',
+                  borderTop: `4px solid ${VIZ.forcedContinuation.hex}`,
+                }}
+              />
+            </div>
+          );
+        })}
+        {/* Model-switch markers — dashed full-height line in the destination model's color */}
+        {switchMarkers.map((m, i) => {
+          const pct = ((m.ts - startTs) / totalMs) * 100;
+          const destColor = getModelColor(m.to).hex;
+          return (
+            <div
+              key={`mw-${i}`}
+              className="absolute top-0 pointer-events-none"
+              style={{
+                left: `${pct}%`,
+                height: `${HEIGHT}px`,
+                width: 0,
+                borderLeft: `1.5px dashed ${destColor}`,
+                marginLeft: '-0.75px',
+                opacity: 0.7,
+                zIndex: 1,
+              }}
+              title={`model switched: ${m.from || '?'} → ${m.to || '?'}`}
+            />
+          );
+        })}
         {/* Playhead — vertical cursor tracking elapsed time. Smooth-transitioned
             on left% so the 250ms tick rate doesn't show as visible jumps. */}
         {playheadPct != null && (

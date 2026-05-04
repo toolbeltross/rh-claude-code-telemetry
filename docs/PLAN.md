@@ -38,9 +38,9 @@ The repo has been cleaned for publishing (LICENSE, `files` allowlist, hardcoded 
 
 - [x] `npm run build` — `dist/` produced cleanly (713 kB bundle, Recharts size warning only — known issue in CLAUDE.md)
 - [x] `npm pack --dry-run` — 36 files, 270.7 kB, no `docs/`/`src/`/`tests/`/`CLAUDE.md`/`.claude/` content
-- [x] `npm pack` — tarball at repo root: `rh-claude-code-telemetry-1.0.0.tgz`. File list verified via `tar -tzf ... | sort`
+- [x] `npm pack` — tarball at repo root: `rh-telemetry-1.0.0.tgz`. File list verified via `tar -tzf ... | sort`
 - [x] Install test: tarball installs cleanly into `/tmp/tmp.cNdXFkmPdc`, `rh-telemetry --help` prints expected usage
-- [x] Name check: `npm view rh-claude-code-telemetry` → 404 (name is **available** on registry)
+- [x] Name check: `npm view rh-telemetry` → 404 (name is **available** on registry)
 
 ### 1.3 Publish  🟡 PICK UP HERE NEXT SESSION
 
@@ -48,16 +48,16 @@ The repo has been cleaned for publishing (LICENSE, `files` allowlist, hardcoded 
 
 - [ ] `npm login` — user runs interactively (browser or terminal flow)
 - [ ] `npm publish` — confirm with user at this gate before running (irreversible, 72-hour unpublish window)
-- [ ] `npm info rh-claude-code-telemetry` — verify the version landed
-- [ ] From a clean shell: `npm install -g rh-claude-code-telemetry`, run `rh-telemetry setup` against a throwaway `HOME`, confirm hooks land
+- [ ] `npm info rh-telemetry` — verify the version landed
+- [ ] From a clean shell: `npm install -g rh-telemetry`, run `rh-telemetry setup` against a throwaway `HOME`, confirm hooks land
 - [ ] If `1.0.0` ships with a problem, bump to `1.0.1` rather than `npm unpublish` unless within the 72-hour window
 
-**State handoff:** tarball `rh-claude-code-telemetry-1.0.0.tgz` at repo root is the artifact that would be published. `npm publish` packs fresh — the existing tarball is inspectable but not consumed by publish. Delete it (`rm rh-claude-code-telemetry-1.0.0.tgz`) after publish succeeds.
+**State handoff:** tarball `rh-telemetry-1.0.0.tgz` at repo root is the artifact that would be published. `npm publish` packs fresh — the existing tarball is inspectable but not consumed by publish. Delete it (`rm rh-telemetry-1.0.0.tgz`) after publish succeeds.
 
 ### 1.4 Recovery notes
 
-- If the name `rh-claude-code-telemetry` is taken, switch to a scope: `@toolbeltross/rh-claude-code-telemetry`, update `package.json → name`, re-run dry-run
-- If a broken version ships, `npm unpublish rh-claude-code-telemetry@1.0.0` works within 72 hours; otherwise publish `1.0.1` with the fix
+- If the name `rh-telemetry` is taken, switch to a scope: `@toolbeltross/rh-telemetry`, update `package.json → name`, re-run dry-run
+- If a broken version ships, `npm unpublish rh-telemetry@1.0.0` works within 72 hours; otherwise publish `1.0.1` with the fix
 - Publishing does not affect local development — no rollback needed for the repo
 
 ---
@@ -149,7 +149,7 @@ Shrunken from the old plan's full `SkillActivity` panel — the data is useful b
 ## Prerequisites
 
 - Node 18+ on PATH (already required by the project)
-- An npm account with publish rights to the `rh-claude-code-telemetry` name — or a decision to use a scope
+- An npm account with publish rights to the `rh-telemetry` name — or a decision to use a scope
 - For Thread 2 dogfooding: a shell with `CLAUDE_CODE_ENABLE_TELEMETRY=1` + related env vars set
 
 ---
@@ -194,7 +194,7 @@ Verified against the codebase on 2026-04-18. Listed so the retired plan files ca
 - 2.2: `filterOurEntries` in `scripts/setup-hooks.js:45–137` has no dead string references
 - 3.1: README no longer says "3-layer validation" or has wrong hook count (verified via grep)
 - 3.2: `README.md:100–103` has Privacy section describing credential reading
-- 4.1–4.2: repo on `github.com/toolbeltross/rh-claude-code-telemetry` matching `package.json`
+- 4.1–4.2: repo on `github.com/toolbeltross/rh-telemetry` matching `package.json`
 - 4.3: `.npmignore` exists (Thread 1.1 tidies remaining stale entries)
 
 Remaining from that plan is only Thread 1 above (`.npmignore` tidy + actual publish).

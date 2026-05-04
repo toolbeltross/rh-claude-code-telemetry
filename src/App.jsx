@@ -83,7 +83,7 @@ function HelpDropdown() {
           <div>
             <h3 className="text-gray-100 font-semibold text-sm mb-1">Quick Start</h3>
             <p>Install globally and set up hooks to enable live telemetry:</p>
-            <code className="block mt-1 bg-gray-950 rounded px-2 py-1.5 text-accent font-mono text-[11px]">npm install -g rh-claude-code-telemetry<br/>rh-telemetry setup<br/>rh-telemetry start</code>
+            <code className="block mt-1 bg-gray-950 rounded px-2 py-1.5 text-accent font-mono text-[11px]">npm install -g rh-telemetry<br/>rh-telemetry setup<br/>rh-telemetry start</code>
           </div>
           <div>
             <h3 className="text-gray-100 font-semibold text-sm mb-1">How It Works</h3>

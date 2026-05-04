@@ -38,10 +38,10 @@ app.post('/api/refresh', (_req, res) => {
   res.json({ status: 'ok', ...result });
 });
 
-// Test-only debug endpoint — gated behind CLAUDE_TELEMETRY_TEST_MODE=1.
+// Test-only debug endpoint — gated behind RH_TELEMETRY_TEST_MODE=1.
 // Allows browser tests to push synthetic state into the store without
 // going through the public hook surface. NEVER mounted in production.
-if (process.env.CLAUDE_TELEMETRY_TEST_MODE === '1') {
+if (process.env.RH_TELEMETRY_TEST_MODE === '1') {
   app.post('/api/_test/state', (req, res) => {
     try {
       const { method, args } = req.body || {};

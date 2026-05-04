@@ -60,7 +60,7 @@ async function scenario({ name, seed, focus }) {
   const home = mkTmpHome();
   const server = await startTestServer({
     tmpHome: home,
-    extraEnv: { CLAUDE_TELEMETRY_TEST_MODE: '1' },
+    extraEnv: { RH_TELEMETRY_TEST_MODE: '1' },
   });
 
   const browser = await chromium.launch({ headless: true });
@@ -100,7 +100,7 @@ async function seedBaseSession(baseUrl, { ctxPct = 25, cost = 1.0, totalTokens =
         cache_creation_input_tokens: 5_000,
       },
     },
-    workspace: { current_dir: '/Users/demo/projects/rh-claude-code-telemetry' },
+    workspace: { current_dir: '/Users/demo/projects/rh-telemetry' },
     _source: 'statusLine',
   });
   await postJson(`${baseUrl}/api/prompt`, {
@@ -249,7 +249,7 @@ async function main() {
               cache_creation_input_tokens: 5_000,
             },
           },
-          workspace: { current_dir: '/Users/demo/projects/rh-claude-code-telemetry' },
+          workspace: { current_dir: '/Users/demo/projects/rh-telemetry' },
           _source: 'statusLine',
         });
       }

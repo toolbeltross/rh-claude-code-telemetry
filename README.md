@@ -94,7 +94,7 @@ Each panel on the dashboard corresponds to a specific phenomenon that the Claude
 ## Quick Install
 
 ```bash
-npm install -g rh-claude-code-telemetry
+npm install -g rh-telemetry
 rh-telemetry setup    # configures hooks + installs /telemetry skill
 rh-telemetry start    # starts dashboard server on :7890
 ```
@@ -104,8 +104,8 @@ Then open http://localhost:7890 in your browser.
 ## Alternative: Clone & Dev
 
 ```bash
-git clone https://github.com/toolbeltross/rh-claude-code-telemetry.git
-cd rh-claude-code-telemetry
+git clone https://github.com/toolbeltross/rh-telemetry.git
+cd rh-telemetry
 npm install
 npm run setup-hooks       # configure Claude Code hooks
 npm run install-skills    # install /telemetry skill

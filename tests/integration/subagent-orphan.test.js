@@ -27,7 +27,7 @@ async function withTestServer(fn) {
     copyFileSync(join(FIXTURES, 'settings/healthy.json'), join(home, '.claude', 'settings.json'));
     const srv = await startTestServer({
       tmpHome: home,
-      extraEnv: { CLAUDE_TELEMETRY_TEST_MODE: '1' },
+      extraEnv: { RH_TELEMETRY_TEST_MODE: '1' },
     });
     try {
       await fn(srv, home);

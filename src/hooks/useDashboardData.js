@@ -71,6 +71,7 @@ function reducer(state, action) {
       const { sessionId, prompt, history } = action.data;
       const sess = state.liveSessions[sessionId];
       if (!sess) return state;
+      const now = Date.now();
       return {
         ...state,
         liveSessions: {
@@ -79,6 +80,15 @@ function reducer(state, action) {
             ...sess,
             _currentPrompt: prompt,
             _promptHistory: history || sess._promptHistory,
+            // Stamp lifecycle timestamps client-side so the heartbeat can
+            // detect "between turns" without waiting for the next statusLine
+            // refresh. Do NOT clear _currentTurnEvents here — the server's
+            // updatePrompt clears it server-side, and the next LIVE_SESSION
+            // dispatch carries the empty array through. Clearing client-side
+            // creates a brief flicker between this dispatch and the next
+            // statusLine refresh that's especially visible in auto mode.
+            _lastUserPromptAt: now,
+            _currentTurnStartTs: now,
           },
         },
         // User submitted a new prompt = session is now processing
@@ -116,6 +126,10 @@ function reducer(state, action) {
             _lastTurnCostDelta: turnCost,
             _tokensPerTurn: tokensPerTurn,
             _estimatedTurnsRemaining: turnsRemaining,
+            // Stamp client-side so the heartbeat can render the user-waiting
+            // idle band immediately on Stop, without waiting for the next
+            // statusLine refresh.
+            _lastStopAt: Date.now(),
           },
         },
         sessionActivity: { ...state.sessionActivity, [sessionId]: 'idle' },

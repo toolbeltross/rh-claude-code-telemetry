@@ -14,7 +14,7 @@
 import http from 'http';
 import { detectEnv, ALLOWLIST, DANGEROUS_PATTERNS, getToolSuggestion } from './env-rules.js';
 
-const TELEMETRY_PORT = parseInt(process.env.CLAUDE_TELEMETRY_PORT || process.env.PORT, 10) || 7890;
+const TELEMETRY_PORT = parseInt(process.env.RH_TELEMETRY_PORT || process.env.PORT, 10) || 7890;
 
 /** Fire-and-forget POST to telemetry server. Never blocks, never throws. */
 function notifyServer(toolName, eventType, reason, sessionId, agentId) {

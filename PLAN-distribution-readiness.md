@@ -104,7 +104,7 @@ These files are superseded and no longer imported or referenced by active code:
 
 ### 4.2 Verify git remote
 - [ ] Confirm remote origin matches the repo URL in package.json
-- [ ] Create the GitHub repo if it doesn't exist yet: `gh repo create toolbeltross/rh-claude-code-telemetry --public`
+- [ ] Create the GitHub repo if it doesn't exist yet: `gh repo create toolbeltross/rh-telemetry --public`
 
 ### 4.3 Add .npmignore as defense-in-depth
 - [ ] Create `.npmignore`:
@@ -130,7 +130,7 @@ These files are superseded and no longer imported or referenced by active code:
 - [ ] `npm run build` — verify dist/ is generated
 - [ ] `npm pack --dry-run` — review final file list, confirm no personal content
 - [ ] `npm pack` — create tarball, extract it, inspect contents manually
-- [ ] Test fresh install: `npm install -g ./rh-claude-code-telemetry-1.0.0.tgz`
+- [ ] Test fresh install: `npm install -g ./rh-telemetry-1.0.0.tgz`
 - [ ] `rh-telemetry setup --dry-run` — verify hooks look correct
 - [ ] `rh-telemetry start` — verify server starts and serves dashboard
 - [ ] `rh-telemetry status` — verify health check works
@@ -138,8 +138,8 @@ These files are superseded and no longer imported or referenced by active code:
 ### 5.2 Publish
 - [ ] `npm login` (if not already)
 - [ ] `npm publish` — publishes to npm registry
-- [ ] Verify: `npm info rh-claude-code-telemetry`
-- [ ] Test: `npm install -g rh-claude-code-telemetry` from a clean environment
+- [ ] Verify: `npm info rh-telemetry`
+- [ ] Test: `npm install -g rh-telemetry` from a clean environment
 
 ---
 

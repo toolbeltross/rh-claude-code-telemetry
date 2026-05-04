@@ -6,7 +6,7 @@ Real-time monitoring dashboard for Claude Code CLI sessions. Built for **real-ti
 
 ### Global install (recommended for users)
 ```bash
-npm install -g rh-claude-code-telemetry
+npm install -g rh-telemetry
 rh-telemetry setup   # configures hooks + installs skills
 rh-telemetry start   # starts server on :7890
 ```
@@ -315,7 +315,7 @@ WS   /ws             — WebSocket for real-time updates (includes failureEvent 
 
 ## CLI — `rh-telemetry` (bin/rh-telemetry.js)
 
-Unified entry point. Installed globally via `npm install -g rh-claude-code-telemetry`.
+Unified entry point. Installed globally via `npm install -g rh-telemetry`.
 
 ```
 rh-telemetry setup        — run setup-hooks.js + install-skills.js
@@ -389,7 +389,7 @@ Four-tier test harness. Plain Node `assert` scripts — no test framework, no ne
 - Tests live in `tests/{unit,integration,browser}/*.test.js`. Each file is run as its own child process by `tests/run.js`.
 - Shared helpers in `tests/helpers/`: `test-harness.js` (`test()`, `summary()`, `afterAll()`), `tmp.js` (mandatory for any FS state), `ports.js` (ephemeral free port), `server.js` (spawn server with `HOME` override for full isolation), `ws-client.js` (WebSocket recorder + `waitFor`).
 - **Isolation rule**: tests MUST use the helpers. Never write to `~/.claude/`, never bind to `:7890`. The integration harness spawns a server with `HOME=<tmpdir>`, which makes `server/config.js`'s `~/.claude/*` paths auto-redirect into the tmp area.
-- Browser tests can push synthetic store state via the gated `/api/_test/state` endpoint (only mounted when `CLAUDE_TELEMETRY_TEST_MODE=1`).
+- Browser tests can push synthetic store state via the gated `/api/_test/state` endpoint (only mounted when `RH_TELEMETRY_TEST_MODE=1`).
 - Test fixtures live in `tests/fixtures/`: settings JSON variants, sample transcript JSONL, sample hook payloads.
 
 ### Pre-commit hook
@@ -407,7 +407,7 @@ Four-tier test harness. Plain Node `assert` scripts — no test framework, no ne
 
 ## Installation Modes
 
-- **Global install**: `npm install -g rh-claude-code-telemetry` → use `rh-telemetry` commands
+- **Global install**: `npm install -g rh-telemetry` → use `rh-telemetry` commands
 - **Local dev**: `git clone` + `npm install` → use `npm run` scripts
 - Generated `/telemetry-setup` SKILL.md includes absolute paths resolved at install time (by design — needed so the skill can find the package wherever it was installed)
 

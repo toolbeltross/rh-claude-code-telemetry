@@ -20,10 +20,10 @@ The `../../README.md` at the repo root references images in this folder. To prod
 
 ## Seeding synthetic data (for repeatable screenshots)
 
-The test harness seeds realistic data via `/api/_test/state` when `CLAUDE_TELEMETRY_TEST_MODE=1` is set. That endpoint is how the Playwright browser tests produce deterministic UI states. The same pattern can be used to produce README screenshots:
+The test harness seeds realistic data via `/api/_test/state` when `RH_TELEMETRY_TEST_MODE=1` is set. That endpoint is how the Playwright browser tests produce deterministic UI states. The same pattern can be used to produce README screenshots:
 
 ```js
-// Start server with CLAUDE_TELEMETRY_TEST_MODE=1
+// Start server with RH_TELEMETRY_TEST_MODE=1
 // POST a session, a compact event, a stuck agent, a string of failures, etc.
 // Open the dashboard, take the screenshot, kill the server.
 ```

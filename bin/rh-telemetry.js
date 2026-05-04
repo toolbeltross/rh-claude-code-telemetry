@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Unified CLI entry point for rh-claude-code-telemetry.
+// Unified CLI entry point for rh-telemetry.
 // Works whether globally installed (npm i -g) or locally cloned.
 
 import { dirname, join } from 'path';
